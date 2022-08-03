@@ -8,6 +8,8 @@
 
 Heya! I'm FulPlan Mutasim, ɪ’ᴍ ᴀ ꜱᴇʟꜰ-ᴛᴀᴜɢʜᴛ ꜰʀᴏɴᴛ ᴇɴᴅ ᴅᴇᴠᴇʟᴏᴘᴇʀ, ʜᴀᴄᴋᴇʀ, ᴘʀɪᴠᴀᴄʏ ᴀᴅᴠᴏᴄᴀᴛᴇ ᴀɴᴅ ᴀ ᴄᴏɴᴛᴇɴᴛ ᴄʀᴇᴀᴛᴏʀ ꜱᴘᴇᴄɪᴀʟɪᴢɪɴɢ ɪɴ ʙᴜɪʟᴅɪɴɢ ᴀɴᴅ ᴏᴄᴄᴀꜱɪᴏɴᴀʟʟʏ ᴅᴏɪɴɢ ᴘᴇɴᴇᴛʀᴀᴛɪᴏɴ ᴛᴇꜱᴛᴇʀ. ᴄᴜʀʀᴇɴᴛʟʏ, ɪ’ᴍ ꜰᴏᴄᴜꜱᴇᴅ ᴏɴ ʙᴜɪʟᴅɪɴɢ ᴀᴄᴄᴇꜱꜱɪʙʟᴇ, ʜᴜᴍᴀɴ-ᴄᴇɴᴛᴇʀᴇᴅ ᴘʀᴏᴅᴜᴄᴛꜱ.
 
+I am also an open-source enthusiast and maintainer. I learned a lot from the open-source community and I love how collaboration and knowledge sharing happened through open-source.
+
 
 - 💼 any freelance work? do reach, [email](mailto:mutasimplan@gmail.com) 😊
 - 💬 ask me about anything, i am happy to help;
