@@ -5,8 +5,7 @@
 <img src="https://b4dcat404.github.io/images/two.gif" width="100%"/>
 
 
-I'm FulPlan Mutasim, full-stack developer, An Open-source enthusiast and maintainer Specializing in bulding Web Apps which focus on providing the best User interaction & experience for everyone using them,I'm focused on buiilding complex appliication with mordern technologies both client and server software.
-
+I'm FulPlan Mutasim, full-stack developer, An Open-source enthusiast and maintainer Specializing in bulding Web Apps which focus on providing the best User interaction & experience for everyone using them,I'm focused on buiilding complex application with modern technologies both client and server.
 
 
 - 💼 any freelance work? do reach, [email](mailto:mutasimplan@gmail.com) 😊
