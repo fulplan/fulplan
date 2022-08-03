@@ -59,7 +59,10 @@ if __name__ == '__main__':
 
 <div align="center">
 <img src="https://user-images.githubusercontent.com/73097560/115834477-dbab4500-a447-11eb-908a-139a6edaec5c.gif"> 
-### ⚡ Fun fact about me: ✨ I love coding+eating+repeating✨
+
+
+### ⚡ Fun fact about me: ✨ I love Coding+Eating+Repeating✨
+
 
 <h2>🌐 Connect with me!  <img src="https://emoji.slack-edge.com/T0172CCPGUW/party-blob/d7253707fa13e9ee.gif" width="30"/><img src="https://emoji.slack-edge.com/T0172CCPGUW/party-blob/d7253707fa13e9ee.gif" width="30"/><img src="https://emoji.slack-edge.com/T0172CCPGUW/party-blob/d7253707fa13e9ee.gif" width="30"/><img src="https://emoji.slack-edge.com/T0172CCPGUW/party-blob/d7253707fa13e9ee.gif" width="30"/></h2>
  
@@ -73,8 +76,8 @@ if __name__ == '__main__':
 
 # 📊 GitHub Stats:
 
-![fulplan's Stats](https://github-readme-stats.vercel.app/api?username=fulplan&theme=radical&show_icons=true&hide_border=true&count_private=true)
-![fulplan's Top Languages](https://github-readme-stats.vercel.app/api/top-langs/?username=fulplan&theme=radical&show_icons=true&hide_border=true&layout=compact)
+![](https://github-readme-stats.vercel.app/api/top-langs/?username=fulplan&theme=radical&hide_border=true&include_all_commits=true&count_private=true&layout=default)
+![fulplan's Stats](https://github-readme-stats.vercel.app/api?username=fulplan&theme=radical&show_icons=true&hide_border=true&count_private=true&layout=default)
 
 <br/>
 
