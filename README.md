@@ -5,10 +5,8 @@
 <img src="https://b4dcat404.github.io/images/two.gif" width="100%"/>
 
 
+I'm FulPlan Mutasim, full-stack developer, An Open-source enthusiast and maintainer Specializing in bulding Web Apps which focus on providing the best User interaction & experience for everyone using them,I'm focused on buiilding complex appliication with mordern technologies both client and server software.
 
-Heya! I'm FulPlan Mutasim, ɪ’ᴍ ᴀ ꜱᴇʟꜰ-ᴛᴀᴜɢʜᴛ ꜰʀᴏɴᴛ ᴇɴᴅ ᴅᴇᴠᴇʟᴏᴘᴇʀ, ʜᴀᴄᴋᴇʀ, ᴘʀɪᴠᴀᴄʏ ᴀᴅᴠᴏᴄᴀᴛᴇ ᴀɴᴅ ᴀ ᴄᴏɴᴛᴇɴᴛ ᴄʀᴇᴀᴛᴏʀ ꜱᴘᴇᴄɪᴀʟɪᴢɪɴɢ ɪɴ ʙᴜɪʟᴅɪɴɢ ᴀɴᴅ ᴏᴄᴄᴀꜱɪᴏɴᴀʟʟʏ ᴅᴏɪɴɢ ᴘᴇɴᴇᴛʀᴀᴛɪᴏɴ ᴛᴇꜱᴛᴇʀ. ᴄᴜʀʀᴇɴᴛʟʏ, ɪ’ᴍ ꜰᴏᴄᴜꜱᴇᴅ ᴏɴ ʙᴜɪʟᴅɪɴɢ ᴀᴄᴄᴇꜱꜱɪʙʟᴇ, ʜᴜᴍᴀɴ-ᴄᴇɴᴛᴇʀᴇᴅ ᴘʀᴏᴅᴜᴄᴛꜱ.
-
-I am also an open-source enthusiast and maintainer. I learned a lot from the open-source community and I love how collaboration and knowledge sharing happened through open-source.
 
 
 - 💼 any freelance work? do reach, [email](mailto:mutasimplan@gmail.com) 😊
