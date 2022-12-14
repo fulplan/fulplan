@@ -2,8 +2,6 @@
   <b>Mutasim Abubakar</b>
 </h1>
 
-<img src="https://b4dcat404.github.io/images/two.gif" width="100%"/>
-
 ## Hi there, I'm Mutasim
 
 I'm FulPlan Mutasim, full-stack developer, An Open-source enthusiast and maintainer Specializing in bulding Web Apps which focus on providing the best User interaction & experience for everyone using them,I'm focused on buiilding complex application with modern technologies both client and server.
@@ -113,16 +111,8 @@ Here are some ideas to get you started:
 
 <br>
 
----
-
 <br/>
-<br/>
-<img src="https://user-images.githubusercontent.com/73097560/115834477-dbab4500-a447-11eb-908a-139a6edaec5c.gif"> 
-<h1 align = 'Center'>Watch a 🐍 eating my contribution graph</h1>
-<p align="center">
-  <img src="https://github.com/fulplan/fulplan1/blob/main/readme-assets/github-contribution-grid-snake.svg" alt="snake"></center>
-</p>
 
 Credit: [fulplan](https://github.com/fulplan)
 
-Last Edited on: 02/07/2022 -->
+    --> Last Edited on: 14/12/2022
