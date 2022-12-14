@@ -57,8 +57,6 @@ if __name__ == '__main__':
   <img src="https://img.shields.io/badge/mysql-%2300f.svg?&style=for-the-badge&logo=mysql&logoColor=white" alt="mysql"/>
   <img src="https://img.shields.io/badge/postgres-%23316192.svg?&style=for-the-badge&logo=postgresql&logoColor=white" alt="postgres"/>
   <img src="https://img.shields.io/badge/django%20-%23092E20.svg?&style=for-the-badge&logo=django&logoColor=white" alt="django"/>
-  <img src="https://img.shields.io/badge/tensorflow-FF8200?logo=&logoColor=white&style=for-the-badge" alt="tensorflow"/>
-  <img src="https://img.shields.io/badge/pandas-130654?logo=&logoColor=white&style=for-the-badge" alt="pandas"/>
 </details>
 
 <details>
