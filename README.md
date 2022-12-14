@@ -16,10 +16,11 @@ In my personal space I love to do /play games :Fifa:, swimming :goat: and uuting
 <br>
 
 ```python
+
 class Fulplan():
 
   def __init__(self):
-    self.name = "FulPlan Mutasim";
+    self.name = "Mutasim Abubakar";
     self.username = "fulplan";
     self.location = "Ashanti Region, Ghana";
     self.twitter = "@fulplan";
@@ -30,6 +31,7 @@ class Fulplan():
 
 if __name__ == '__main__':
     me = Fulplan()
+
 ```
 
 **More about me on:**
@@ -85,8 +87,6 @@ if __name__ == '__main__':
 		</li>
 	</ul>
 </details>
-<!--
-**fulplan/fulplan** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
 
 Here are some ideas to get you started:
 
@@ -98,7 +98,6 @@ Here are some ideas to get you started:
 - 📫 How to reach me: ...
 - 😄 Pronouns: ...
 - ⚡ Fun fact: ...
-  -->
 
 <br>
 
