@@ -2,7 +2,7 @@
   <b>Mutasim Abubakar</b>
 </h1>
 
-## Hi there, I'm Mutasim
+## Hi there, I'm FulPlan
 
 I'm FulPlan Mutasim, full-stack developer, An Open-source enthusiast and maintainer Specializing in bulding Web Apps which focus on providing the best User interaction & experience for everyone using them,I'm focused on buiilding complex application with modern technologies both client and server.
 
