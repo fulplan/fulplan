@@ -6,7 +6,7 @@
 
 I'm FulPlan Mutasim, full-stack developer, An Open-source enthusiast and maintainer Specializing in bulding Web Apps which focus on providing the best User interaction & experience for everyone using them,I'm focused on buiilding complex application with modern technologies both client and server.
 
-In my personal space I love to do /play games :Fifa:, swimming :goat: and uuting. I would love to travel around the world, My next destination will be the Sweet Land Of Liberty(USA) :New York/California:
+In my personal space I love to do /play games :Fifa:, swimming :goat: and outing. I would love to travel around the world:
 
 - 💼 any freelance work? do reach, [email](mailto:mutasimplan@gmail.com) 😊
 - 💬 ask me about anything, i am happy to help;
