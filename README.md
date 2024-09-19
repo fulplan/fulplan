@@ -64,19 +64,19 @@ if __name__ == '__main__':
 	<br/>
 	<ul>
 		<li>
-			<a href="https://medium.com/analytics-vidhya/time-series-forecasting-of-exchange-currency-with-tensor-flow-f475927a68b8?sk=834805966e10b0749ce6464e880de49c">Time series forecasting of exchange currency with Tensor Flow</a>
+<!-- 			<a href="https://medium.com/analytics-vidhya/time-series-forecasting-of-exchange-currency-with-tensor-flow-f475927a68b8?sk=834805966e10b0749ce6464e880de49c">Time series forecasting of exchange currency with Tensor Flow</a> -->
 		</li>
 		<li>
-			<a href="https://medium.com/analytics-vidhya/achieve-bayesian-optimization-for-tuning-hyper-parameters-df1aad6cb49a?sk=3f0e6bb641dcb71695c034393c6fb8f8">Achieve Bayesian optimization for tuning hyper-parameters</a>
+<!-- 			<a href="https://medium.com/analytics-vidhya/achieve-bayesian-optimization-for-tuning-hyper-parameters-df1aad6cb49a?sk=3f0e6bb641dcb71695c034393c6fb8f8">Achieve Bayesian optimization for tuning hyper-parameters</a> -->
 		</li>
 		<li>
-			<a href="https://medium.com/analytics-vidhya/understanding-transfer-learning-as-an-methodology-for-efficiency-in-training-cnns-models-1322d316173a?sk=ac8f319a11939d403866c9c310ddfc41">Understanding Transfer Learning as an methodology for efficiency in training CNN’s models</a>
+<!-- 			<a href="https://medium.com/analytics-vidhya/understanding-transfer-learning-as-an-methodology-for-efficiency-in-training-cnns-models-1322d316173a?sk=ac8f319a11939d403866c9c310ddfc41">Understanding Transfer Learning as an methodology for efficiency in training CNN’s models</a> -->
 		</li>
 		<li>
-			<a href="https://medium.com/analytics-vidhya/understanding-the-imagenet-classification-with-deep-convolutional-neural-networks-e76c7b3a182f?sk=e416cadade43a634df54b6dcd2395b88">Understanding the ImageNet classification with Deep Convolutional Neural Networks</a>
+<!-- 			<a href="https://medium.com/analytics-vidhya/understanding-the-imagenet-classification-with-deep-convolutional-neural-networks-e76c7b3a182f?sk=e416cadade43a634df54b6dcd2395b88">Understanding the ImageNet classification with Deep Convolutional Neural Networks</a> -->
 		</li>
     <li>
-			<a href="https://www.linkedin.com/pulse/development-full-stack-web-application-commodoro-edward-a-ortiz/?trackingId=QS5wplnprLCFC9AXFdAyyg%3D%3D">Development of the full stack web application “Commodoro”</a>
+<!-- 			<a href="https://www.linkedin.com/pulse/development-full-stack-web-application-commodoro-edward-a-ortiz/?trackingId=QS5wplnprLCFC9AXFdAyyg%3D%3D">Development of the full stack web application “Commodoro”</a> -->
 		</li>
 		<li>
 			<a href="https://medium.com/@fulplan"><i>More…</i></a>
