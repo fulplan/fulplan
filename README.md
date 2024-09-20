@@ -4,9 +4,9 @@
 
 ## Hi there, I'm FulPlan
 
-I'm FulPlan Mutasim, full-stack developer, An Open-source enthusiast and maintainer Specializing in bulding Web Apps which focus on providing the best User interaction & experience for everyone using them,I'm focused on buiilding complex application with modern technologies both client and server.
+I'm FulPlan Mutasim, junior developer, An Open-source enthusiast and maintainer Specializing in bulding Web Apps which focus on providing the best User interaction & experience for everyone using them,I'm focused on buiilding complex application with modern technologies both client and server.
 
-In my personal space I love to do /play games :Fifa:, swimming :goat: and outing. I would love to travel around the world:
+In my personal space I love to do /play games :Fifa :Call Of Duty, :Pubg, swimming and outing. I would love to travel around the world:
 
 - 💼 any freelance work? do reach, [email](mailto:mutasimplan@gmail.com) 😊
 - 💬 ask me about anything, i am happy to help;
