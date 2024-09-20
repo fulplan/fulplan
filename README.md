@@ -15,20 +15,21 @@ In my personal space I love to do /play games :Fifa :Call Of Duty, :Pubg, swimmi
 
 ```python
 
-class Fulplan():
+class Fulplan:
+    def __init__(self):
+        self.name = "Mutasim Abubakar"
+        self.username = "fulplan"
+        self.location = "Ashanti Region, Ghana"
+        self.twitter = "@fulplan"
+        self.web = "https://fulplan.medium.com"
 
-  def __init__(self):
-    self.name = "Mutasim Abubakar";
-    self.username = "fulplan";
-    self.location = "Ashanti Region, Ghana";
-    self.twitter = "@fulplan";
-    self.web = "https://fulplan.medium.com";
-
-  def __str__(self):
-    return self.name
+    def __str__(self):
+        return self.name
 
 if __name__ == '__main__':
     me = Fulplan()
+    print(me)  # This will print the name when you run the script
+
 
 ```
 
