@@ -28,8 +28,7 @@ class Fulplan:
 
 if __name__ == '__main__':
     me = Fulplan()
-    print(me)  # This will print the name when you run the script
-
+    print(me)  
 
 ```
 
