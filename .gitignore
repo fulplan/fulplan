@@ -1,0 +1,43 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# builds
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# env & secrets — never commit these
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+logs/
+
+# test / coverage
+coverage/
+.nyc_output/
+
+# editors
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# obsidian — keep the vault notes, ignore personal UI state
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+
+# prisma
+backend/prisma/*.db
+backend/prisma/*.db-journal
+
+# local postgres volume
+.docker-data/

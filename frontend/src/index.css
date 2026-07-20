@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+/*
+  GhPOS design tokens — see Design-Language.md in the project vault.
+
+  The user is standing at a shop counter, often in direct sunlight, on a cheap
+  low-contrast screen, serving a queue. That rules out soft pastel SaaS palettes.
+  Every colour here is a STATUS SIGNAL, never decoration.
+*/
+@theme {
+  /* Surfaces & text */
+  --color-ink: #0b1220; /* primary text; near-black, slightly blue — reads darker in glare */
+  --color-paper: #ffffff; /* surfaces; pure white for maximum contrast */
+  --color-field: #eef1f6; /* inputs & inactive surfaces */
+  --color-line: #c9d1de; /* borders — heavier than typical SaaS hairlines, which vanish on cheap panels */
+  --color-muted: #5b6879; /* secondary text */
+
+  /* Status colours */
+  --color-brand: #0b7a4b; /* primary action, confirmed payment, positive totals */
+  --color-warn: #b45309; /* offline, pending payment, low stock */
+  --color-danger: #b4231e; /* destructive, variance, expired stock */
+
+  /* No rounded corners anywhere — sharp rectangles throughout. */
+  --radius-*: initial;
+
+  /* Touch targets: 56px minimum, 64px on the checkout path. */
+  --spacing-touch: 3.5rem; /* 56px */
+  --spacing-touch-lg: 4rem; /* 64px */
+
+  /* Short, deliberate type scale — a POS with twelve text sizes can't be scanned fast. */
+  --text-xs: 0.75rem; /* 12 */
+  --text-sm: 0.875rem; /* 14 */
+  --text-base: 1rem; /* 16 */
+  --text-lg: 1.25rem; /* 20 */
+  --text-xl: 1.75rem; /* 28 */
+  --text-total: 2.75rem; /* 44 — the running total, the one loud thing on screen */
+}
+
+@layer base {
+  /* Belt-and-braces on the no-rounded-corners rule: third-party components
+     (shadcn/ui ships rounded-* classes) can't sneak radius back in. */
+  *,
+  *::before,
+  *::after {
+    border-radius: 0 !important;
+  }
+
+  html {
+    /* System font stack — zero load cost, native on every device. */
+    font-family:
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      "Helvetica Neue",
+      Arial,
+      sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    margin: 0;
+    min-height: 100dvh;
+  }
+
+  /* Prices must align in columns and must not jitter as digits change
+     during entry. Non-negotiable — see Design-Language.md. */
+  .tabular,
+  input[inputmode="decimal"],
+  input[inputmode="numeric"] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Motion budget: 150ms, transforms only. Enough to show causality,
+     never enough to make anyone wait. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

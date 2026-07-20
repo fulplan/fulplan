@@ -1,0 +1,24 @@
+# Local development database only. Production Postgres lives on Railway.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ghpos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ghpos
+      POSTGRES_PASSWORD: ghpos_dev_password
+      POSTGRES_DB: ghpos_dev
+    # Host port 5433 — 5432 is already taken by a local PostgreSQL install.
+    ports:
+      - "5433:5432"
+    volumes:
+      - ghpos-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ghpos -d ghpos_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ghpos-pgdata:

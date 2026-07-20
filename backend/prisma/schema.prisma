@@ -1,0 +1,142 @@
+// GhPOS — multi-tenant retail POS
+//
+// Conventions (see Data-Model.md / Architecture.md in the project vault):
+//  * Every tenant-scoped table carries organizationId and is indexed on it.
+//    Isolation is enforced twice: app-level tRPC middleware AND Postgres RLS.
+//  * All money is stored as Int in MINOR UNITS (pesewas). Never Float/Decimal.
+//  * Stock will be event-sourced: stock_movements is the source of truth,
+//    stock_levels a rebuildable cache. (Added with the inventory feature.)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  CASHIER
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  LOCKED
+  CANCELLED
+}
+
+/// A tenant. One shop business = one Organization.
+model Organization {
+  id   String @id @default(cuid())
+  name String
+
+  subscriptionStatus SubscriptionStatus @default(TRIALING)
+  trialEndsAt        DateTime?
+
+  // Growth loop: every org gets a code; referredByCode records who sent them.
+  referralCode   String  @unique
+  referredByCode String?
+
+  // Set when the org self-service deletes; retained through a grace period.
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branches Branch[]
+  users    User[]
+  devices  Device[]
+
+  @@index([subscriptionStatus])
+  @@map("organizations")
+}
+
+/// A physical shop location. An Organization may have many.
+model Branch {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name    String
+  address String?
+
+  // Printed at the top of receipts for this branch.
+  receiptHeader String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users   User[]
+  devices Device[]
+
+  @@index([organizationId])
+  @@map("branches")
+}
+
+/// Staff. Owners/managers sign in with email + password; cashiers with a PIN.
+model User {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name  String
+  role  Role   @default(CASHIER)
+
+  // Owner/manager identity + account recovery anchor.
+  email        String?
+  passwordHash String?
+
+  // Cashier fast login. Device-bound and rate-limited at the API layer.
+  pinHash String?
+
+  phone String?
+
+  // Cashiers are assigned to a branch; owners see all branches by default.
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  devices Device[]
+
+  // Email is unique per tenant, not globally — the same person could own
+  // two separate shop businesses on the platform.
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@index([organizationId, branchId])
+  @@map("users")
+}
+
+/// A registered till/tablet/PC. Owners can revoke one remotely when a
+/// device is lost or stolen, which invalidates its sessions.
+model Device {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  label     String
+  tokenHash String  @unique
+
+  lastSeenAt DateTime?
+  revokedAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("devices")
+}
