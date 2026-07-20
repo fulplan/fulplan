@@ -6,7 +6,7 @@ tags: [tracker, status]
 
 Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
-Last updated: 2026-07-20 — **scaffold + multi-tenant auth foundation done. 38 tests passing.**
+Last updated: 2026-07-20 — **frontend auth UI done. Signup, login, PIN screen, session restoration all verified live.**
 
 ## Phase 1 — MVP SaaS core
 
@@ -39,8 +39,8 @@ Last updated: 2026-07-20 — **scaffold + multi-tenant auth foundation done. 38 
 - [x] Tenant-isolation automated test suite — 14 tests covering reads, writes, and guard rails
 - [x] Auth test suite — 19 tests covering signup, login, PIN login, rate limiting, revocation, permissions, lock
 - [ ] **Postgres Row-Level Security policies** — deliberately deferred, see note below
-- [ ] Hard-reset-on-logout/org-switch behavior (needs the frontend auth UI first)
-- [ ] Frontend auth UI (signup, owner login, cashier PIN screen)
+- [x] Hard-reset-on-logout/org-switch behavior (logout keeps device token; org-switch calls hardReset which clears everything)
+- [x] Frontend auth UI (signup, owner login, cashier PIN screen)
 
 > **On the deferred RLS layer.** The app-level scoping above is implemented and
 > tested. RLS was meant to sit *underneath* it as a second net. Doing it properly

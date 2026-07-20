@@ -9,6 +9,7 @@ export interface SessionUser {
   role: Role;
   organizationId: string;
   organizationName: string;
+  branchId: string | null;
 }
 
 interface AuthContextValue {

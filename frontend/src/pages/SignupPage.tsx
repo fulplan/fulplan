@@ -24,6 +24,7 @@ export function SignupPage({ onSignedUp, onLoginClick }: Props) {
         role: 'OWNER',
         organizationId: data.organization.id,
         organizationName: data.organization.name,
+        branchId: null, // populated on next load via auth.me
       });
     },
     onError(err) {

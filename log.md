@@ -64,3 +64,13 @@ Second design decision worth recording: creates are **validated, not injected**.
 **Deferred honestly**: Postgres RLS. It needs a dedicated DB role plus per-query session variables to be real; enabling policies while connecting as the table owner would bypass RLS entirely and give false confidence. Flagged in [[Tracker]] as its own task rather than quietly skipped.
 
 **Next**: frontend auth UI (signup, owner login, cashier PIN screen) plus the hard-reset-on-logout behavior for shared devices.
+
+## 2026-07-20 — Frontend auth UI built and verified live
+
+Signup, login, and cashier PIN screen all working end-to-end against the real backend.
+
+Built: signup form (shop name, owner name, email, password, branch name, optional referral code) · owner/manager login with multi-shop `choose_organization` picker · optional device registration on login (stores device token enabling PIN screen) · cashier PIN screen (staff list from device token, tap-to-select, 4-6 digit keypad) · session restoration on page reload (`auth.me` verifies stored JWT) · logout/sign-out behavior.
+
+**Key design decision on logout**: regular logout removes the JWT but keeps the device token, so the PIN screen shows for the next cashier shift without the owner having to re-register the device. A separate `hardReset()` (used for org switch and security events) clears everything including the device token. Both do a full page reload to clear React state and TanStack Query cache — shared tablet safety.
+
+**Next**: products and inventory CRUD (phase 1 item 5) or super-admin panel v1 (item 3). Products unlocks the checkout screen, which is the core of the POS.

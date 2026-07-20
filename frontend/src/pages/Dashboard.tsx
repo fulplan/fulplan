@@ -1,24 +1,52 @@
+import { useState } from 'react';
 import { useAuth } from '../lib/auth-context';
+import { ProductsPage } from './ProductsPage';
 
-const ROLE_LABEL: Record<string, string> = {
-  OWNER: 'Owner',
-  MANAGER: 'Manager',
-  CASHIER: 'Cashier',
-};
+type Page = 'dashboard' | 'products' | 'staff';
+
+const NAV: { id: Page; label: string; roles?: string[] }[] = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'products', label: 'Products' },
+  { id: 'staff', label: 'Staff', roles: ['OWNER', 'MANAGER'] },
+];
 
 export function Dashboard() {
   const { user, signOut } = useAuth();
+  const [page, setPage] = useState<Page>('dashboard');
 
   if (!user) return null;
 
+  const visibleNav = NAV.filter(
+    (n) => !n.roles || n.roles.includes(user.role),
+  );
+
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="border-b-2 border-ink px-5 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">GhPOS</h1>
-            <p className="mt-0.5 text-sm text-muted">{user.organizationName}</p>
-          </div>
+      {/* Top bar */}
+      <header className="border-b-2 border-ink px-4 py-3 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-6">
+          <span className="text-base font-semibold tracking-tight">
+            {user.organizationName}
+          </span>
+          <nav className="flex gap-1">
+            {visibleNav.map((n) => (
+              <button
+                key={n.id}
+                onClick={() => setPage(n.id)}
+                className={[
+                  'px-3 py-1.5 text-sm font-medium',
+                  page === n.id
+                    ? 'bg-ink text-paper'
+                    : 'text-muted hover:bg-field',
+                ].join(' ')}
+              >
+                {n.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted">{user.name}</span>
           <button
             onClick={signOut}
             className="border border-line px-3 py-1.5 text-sm hover:bg-field"
@@ -28,20 +56,33 @@ export function Dashboard() {
         </div>
       </header>
 
-      <main className="flex-1 p-5">
-        <div className="mb-6 border border-line p-4">
-          <p className="text-sm text-muted">Signed in as</p>
-          <p className="mt-1 text-base font-semibold">{user.name}</p>
-          <p className="text-sm text-muted">{ROLE_LABEL[user.role] ?? user.role}</p>
-        </div>
-
-        <div className="border border-warn bg-field p-4">
-          <p className="text-sm font-semibold text-warn">Dashboard coming soon</p>
-          <p className="mt-1 text-sm text-muted">
-            Auth is working. Products, checkout, reports, and inventory are next.
-          </p>
-        </div>
+      {/* Page content */}
+      <main className="flex-1">
+        {page === 'dashboard' && <DashboardHome />}
+        {page === 'products' && <ProductsPage />}
+        {page === 'staff' && <StaffPlaceholder />}
       </main>
+    </div>
+  );
+}
+
+function DashboardHome() {
+  return (
+    <div className="p-5">
+      <div className="border border-warn bg-field p-4 max-w-lg">
+        <p className="text-sm font-semibold text-warn">Dashboard coming soon</p>
+        <p className="mt-1 text-sm text-muted">
+          Use the Products tab to add your inventory.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function StaffPlaceholder() {
+  return (
+    <div className="p-5">
+      <p className="text-sm text-muted">Staff management coming soon.</p>
     </div>
   );
 }

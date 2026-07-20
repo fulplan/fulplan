@@ -48,9 +48,13 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  branches Branch[]
-  users    User[]
-  devices  Device[]
+  branches       Branch[]
+  users          User[]
+  devices        Device[]
+  categories     Category[]
+  products       Product[]
+  stockLevels    StockLevel[]
+  stockMovements StockMovement[]
 
   @@index([subscriptionStatus])
   @@map("organizations")
@@ -71,8 +75,10 @@ model Branch {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users   User[]
-  devices Device[]
+  users          User[]
+  devices        Device[]
+  stockLevels    StockLevel[]
+  stockMovements StockMovement[]
 
   @@index([organizationId])
   @@map("branches")
@@ -105,7 +111,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  devices Device[]
+  devices        Device[]
+  stockMovements StockMovement[]
 
   // Email is unique per tenant, not globally — the same person could own
   // two separate shop businesses on the platform.
@@ -113,6 +120,119 @@ model User {
   @@index([organizationId])
   @@index([organizationId, branchId])
   @@map("users")
+}
+
+/// Product category — organises the product grid and reports.
+model Category {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name String
+
+  createdAt DateTime @default(now())
+
+  products Product[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("categories")
+}
+
+enum MovementType {
+  PURCHASE   // stock in — receiving from supplier
+  SALE       // stock out — from checkout
+  ADJUSTMENT // manual correction / stock take
+  RETURN     // stock back in — customer return
+}
+
+/// A sellable item.
+///
+/// Barcodes are TENANT-scoped — two shops legitimately use the same
+/// manufacturer barcode for different local stock, so no global uniqueness.
+///
+/// Unit conversion: a "carton of 24 pieces" means purchaseUnit="carton",
+/// saleUnit="piece", unitsPerPurchase=24.  Stock is always tracked in sale
+/// units.
+model Product {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name    String
+  barcode String?
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  // Unit conversion (purchase → sale).  Defaults to 1:1.
+  purchaseUnit     String @default("unit")
+  saleUnit         String @default("unit")
+  unitsPerPurchase Int    @default(1)
+
+  // All prices in PESEWAS (minor units).  Never Float.
+  costPrice    Int // what we paid per sale unit
+  sellingPrice Int // what we charge per sale unit
+
+  lowStockThreshold Int @default(5)
+  imageUrl          String?
+  active            Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stockLevels    StockLevel[]
+  stockMovements StockMovement[]
+
+  @@index([organizationId])
+  @@index([organizationId, barcode])
+  @@map("products")
+}
+
+/// Per-branch stock count cache.  Rebuilt from stock_movements if corrupted.
+model StockLevel {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  branchId  String
+  branch    Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  quantity Int @default(0) // in sale units
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, branchId])
+  @@index([organizationId])
+  @@map("stock_levels")
+}
+
+/// Append-only stock ledger.  Never update or delete rows — add corrections.
+/// quantity is SIGNED: positive = stock in, negative = stock out (sale units).
+model StockMovement {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  branchId  String
+  branch    Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  type     MovementType
+  quantity Int // signed, in sale units
+  note     String?
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([productId, branchId])
+  @@map("stock_movements")
 }
 
 /// A registered till/tablet/PC. Owners can revoke one remotely when a

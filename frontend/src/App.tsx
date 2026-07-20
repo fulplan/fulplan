@@ -36,6 +36,7 @@ export function App() {
         role: me.role,
         organizationId: me.organization.id,
         organizationName: me.organization.name,
+        branchId: me.branchId,
       });
       setScreen('dashboard');
     } else if (meQuery.isError) {
