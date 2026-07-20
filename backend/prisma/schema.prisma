@@ -55,6 +55,7 @@ model Organization {
   products       Product[]
   stockLevels    StockLevel[]
   stockMovements StockMovement[]
+  sales          Sale[]
 
   @@index([subscriptionStatus])
   @@map("organizations")
@@ -79,6 +80,7 @@ model Branch {
   devices        Device[]
   stockLevels    StockLevel[]
   stockMovements StockMovement[]
+  sales          Sale[]
 
   @@index([organizationId])
   @@map("branches")
@@ -113,6 +115,8 @@ model User {
 
   devices        Device[]
   stockMovements StockMovement[]
+  sales          Sale[]          @relation("SaleCashier")
+  voidedSales    Sale[]          @relation("SaleVoidedBy")
 
   // Email is unique per tenant, not globally — the same person could own
   // two separate shop businesses on the platform.
@@ -144,6 +148,16 @@ enum MovementType {
   SALE       // stock out — from checkout
   ADJUSTMENT // manual correction / stock take
   RETURN     // stock back in — customer return
+}
+
+enum SaleStatus {
+  COMPLETED
+  VOIDED
+}
+
+enum PaymentMethod {
+  CASH
+  MOMO
 }
 
 /// A sellable item.
@@ -183,6 +197,7 @@ model Product {
 
   stockLevels    StockLevel[]
   stockMovements StockMovement[]
+  saleItems      SaleItem[]
 
   @@index([organizationId])
   @@index([organizationId, barcode])
@@ -225,6 +240,9 @@ model StockMovement {
   quantity Int // signed, in sale units
   note     String?
 
+  saleId String?
+  sale   Sale?   @relation(fields: [saleId], references: [id], onDelete: SetNull)
+
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id])
 
@@ -259,4 +277,62 @@ model Device {
   @@index([organizationId])
   @@index([userId])
   @@map("devices")
+}
+
+/// A completed or voided sales transaction.
+model Sale {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  branchId  String
+  branch    Branch @relation(fields: [branchId], references: [id])
+  cashierId String
+  cashier   User   @relation("SaleCashier", fields: [cashierId], references: [id])
+
+  status        SaleStatus    @default(COMPLETED)
+  paymentMethod PaymentMethod
+
+  // All amounts in PESEWAS.
+  subtotal       Int
+  discountTotal  Int @default(0)
+  total          Int
+  amountTendered Int
+  change         Int @default(0)
+
+  note String?
+
+  voidedAt   DateTime?
+  voidedById String?
+  voidedBy   User?    @relation("SaleVoidedBy", fields: [voidedById], references: [id])
+  voidReason String?
+
+  createdAt DateTime @default(now())
+
+  items          SaleItem[]
+  stockMovements StockMovement[]
+
+  @@index([organizationId])
+  @@index([organizationId, branchId, createdAt])
+  @@map("sales")
+}
+
+/// A single line item in a sale. Prices are snapshots at time of sale.
+model SaleItem {
+  id     String @id @default(cuid())
+  saleId String
+  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  name      String // snapshot — product name may change later
+  quantity  Int
+  unitPrice Int    // pesewas snapshot
+  costPrice Int    // pesewas snapshot (for margin reporting)
+  lineTotal Int    // pesewas = quantity * unitPrice
+
+  @@index([saleId])
+  @@index([productId])
+  @@map("sale_items")
 }

@@ -6,7 +6,7 @@ tags: [tracker, status]
 
 Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
-Last updated: 2026-07-20 — **frontend auth UI done. Signup, login, PIN screen, session restoration all verified live.**
+Last updated: 2026-07-20 — **checkout screen done. Sale + stock decrement atomic transaction verified live. MoMo recording, USB scanner support, mobile cart bar included.**
 
 ## Phase 1 — MVP SaaS core
 
@@ -63,22 +63,22 @@ Last updated: 2026-07-20 — **frontend auth UI done. Signup, login, PIN screen,
 - [ ] Placeholder/manual lock behavior (full Paystack automation may land end of Phase 1 or Phase 2)
 
 ### 5. Products & inventory
-- [ ] Product CRUD (barcode, cost/selling price, category)
-- [ ] Unit conversion (purchase unit vs. sale unit, e.g. carton → piece)
-- [ ] Per-branch stock levels (rebuildable cache)
-- [ ] `stock_movements` event log (source of truth)
-- [ ] Low-stock alerts (in-app)
-- [ ] Product categories
+- [x] Product CRUD (barcode, cost/selling price, category)
+- [x] Unit conversion (purchase unit vs. sale unit, e.g. carton → piece)
+- [x] Per-branch stock levels (rebuildable cache)
+- [x] `stock_movements` event log (source of truth)
+- [x] Low-stock alerts (in-app banner on products page)
+- [x] Product categories (with inline quick-add in product form)
 - [ ] Starter catalog (common Ghanaian provision-store products) + bulk-copy at signup
 - [ ] Cloudinary image upload
 
 ### 6. Checkout screen
-- [ ] Product tile grid (text-first) + search
+- [x] Product tile grid (text-first) + search
 - [ ] Camera barcode scan (`html5-qrcode`)
-- [ ] USB scanner support (keyboard-emulation, works natively)
-- [ ] Cart + running total, mobile bottom-sheet cart on narrow widths
-- [ ] Cash payment + change calculation
-- [ ] Manual MoMo recording
+- [x] USB scanner support (keyboard-emulation, works natively)
+- [x] Cart + running total, mobile bottom-sheet cart on narrow widths
+- [x] Cash payment + change calculation
+- [x] Manual MoMo recording
 - [ ] Split payments (multiple tender lines per sale)
 - [ ] Optimistic UI (instant complete, background save)
 - [ ] Sync failure queue + retry + "N unsynced" badge

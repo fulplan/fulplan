@@ -1,18 +1,26 @@
 import { useState } from 'react';
 import { useAuth } from '../lib/auth-context';
+import { CheckoutPage } from './CheckoutPage';
 import { ProductsPage } from './ProductsPage';
 
-type Page = 'dashboard' | 'products' | 'staff';
+type Page = 'checkout' | 'dashboard' | 'products' | 'staff';
 
 const NAV: { id: Page; label: string; roles?: string[] }[] = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'products', label: 'Products' },
+  { id: 'checkout', label: 'Checkout' },
+  { id: 'dashboard', label: 'Dashboard', roles: ['OWNER', 'MANAGER'] },
+  { id: 'products', label: 'Products', roles: ['OWNER', 'MANAGER'] },
   { id: 'staff', label: 'Staff', roles: ['OWNER', 'MANAGER'] },
 ];
 
+function defaultPage(role: string): Page {
+  return role === 'CASHIER' ? 'checkout' : 'dashboard';
+}
+
 export function Dashboard() {
   const { user, signOut } = useAuth();
-  const [page, setPage] = useState<Page>('dashboard');
+  const [page, setPage] = useState<Page>(() =>
+    defaultPage(user?.role ?? 'CASHIER'),
+  );
 
   if (!user) return null;
 
@@ -57,7 +65,8 @@ export function Dashboard() {
       </header>
 
       {/* Page content */}
-      <main className="flex-1">
+      <main className="flex flex-1 flex-col">
+        {page === 'checkout' && <CheckoutPage />}
         {page === 'dashboard' && <DashboardHome />}
         {page === 'products' && <ProductsPage />}
         {page === 'staff' && <StaffPlaceholder />}
@@ -72,7 +81,7 @@ function DashboardHome() {
       <div className="border border-warn bg-field p-4 max-w-lg">
         <p className="text-sm font-semibold text-warn">Dashboard coming soon</p>
         <p className="mt-1 text-sm text-muted">
-          Use the Products tab to add your inventory.
+          Use the Checkout tab to start selling or Products to manage inventory.
         </p>
       </div>
     </div>

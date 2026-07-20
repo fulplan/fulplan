@@ -5,6 +5,7 @@ import { categoriesRouter } from "./categories";
 import { devicesRouter } from "./devices";
 import { healthRouter } from "./health";
 import { productsRouter } from "./products";
+import { salesRouter } from "./sales";
 import { staffRouter } from "./staff";
 
 export const appRouter = router({
@@ -15,6 +16,7 @@ export const appRouter = router({
   branches: branchesRouter,
   categories: categoriesRouter,
   products: productsRouter,
+  sales: salesRouter,
 });
 
 /** The frontend imports this type only — no server code crosses the wire. */
