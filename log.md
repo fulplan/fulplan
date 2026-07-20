@@ -51,3 +51,16 @@ Built and verified:
 Not yet done: shadcn/ui components, ESLint/Prettier, and both deploys (Vercel + Railway). See [[Tracker]].
 
 **Next**: the multi-tenant foundation — signup, JWT auth, PIN login, tenant-scoping middleware, Postgres RLS, and the isolation test suite. Everything else depends on it.
+
+## 2026-07-20 — Multi-tenant auth foundation built (38 tests passing)
+The load-bearing layer everything else sits on. Backend complete; frontend auth UI still to come.
+
+Built: self-service signup (atomic org + branch + owner, 30-day trial, referral capture) · JWT auth with owner/manager passwords and cashier PINs · in-memory rate limiting on both login paths · device registration and remote revocation · `tenantDb` auto-scoping every Prisma query · role guards · subscription lock making a delinquent tenant read-only · staff and device management routers.
+
+**The tests earned their keep immediately.** The isolation suite caught a real security bug on first run: `scopeWhere` was *overwriting* the caller's filter rather than intersecting with it, so a query explicitly asking for another tenant's rows silently returned *your own* rows — wrong data presented as correct. Fixed to AND the tenant condition alongside the caller's, so conflicting filters honestly return nothing. This is exactly the class of bug that would never have surfaced in manual testing.
+
+Second design decision worth recording: creates are **validated, not injected**. Prisma's generated types already require `organizationId` on create, so forgetting it is a compile error — there's no silent-leak risk to defend against. Injecting would instead silently overwrite a *wrong* value and mask the bug. So `tenantDb` checks the value matches the session and throws if not.
+
+**Deferred honestly**: Postgres RLS. It needs a dedicated DB role plus per-query session variables to be real; enabling policies while connecting as the table owner would bypass RLS entirely and give false confidence. Flagged in [[Tracker]] as its own task rather than quietly skipped.
+
+**Next**: frontend auth UI (signup, owner login, cashier PIN screen) plus the hard-reset-on-logout behavior for shared devices.

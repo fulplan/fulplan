@@ -1,8 +1,10 @@
 import { PrismaClient } from "@prisma/client";
-import { env, isProduction } from "./env";
+import { env } from "./env";
 
 export const prisma = new PrismaClient({
-  log: isProduction ? ["warn", "error"] : ["warn", "error"],
+  // Tests deliberately trigger failing queries (proving isolation holds), so
+  // Prisma's error logging is pure noise there.
+  log: env.NODE_ENV === "test" ? [] : ["warn", "error"],
 });
 
 // Reuse the client across tsx watch reloads in development so we don't

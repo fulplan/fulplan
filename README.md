@@ -34,12 +34,29 @@ npm run db:up
 npm run db:migrate
 npm run db:seed
 
-# 5. Run both apps
+# 5. Create the test database (separate from dev — tests truncate tables)
+npm run db:test:setup --workspace=backend
+
+# 6. Run both apps
 npm run dev
 ```
 
 - Frontend: http://localhost:5173
 - API: http://localhost:3000 (health check at `/health`, tRPC at `/trpc`)
+
+## Testing
+
+```bash
+npm test
+```
+
+Tests run against a **separate `ghpos_test` database** and truncate every table
+between runs, so they never touch your dev data. Re-run `db:test:setup` after
+changing the Prisma schema.
+
+The highest-value tests are `backend/src/lib/tenant-db.test.ts` — they assert
+that one shop cannot read or write another shop's data through any Prisma
+operation. Treat a failure there as a release blocker, not a flaky test.
 
 ## Scripts
 

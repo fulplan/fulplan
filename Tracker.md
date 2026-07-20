@@ -6,7 +6,7 @@ tags: [tracker, status]
 
 Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
-Last updated: 2026-07-20 — **scaffold complete and running locally.**
+Last updated: 2026-07-20 — **scaffold + multi-tenant auth foundation done. 38 tests passing.**
 
 ## Phase 1 — MVP SaaS core
 
@@ -29,15 +29,26 @@ Last updated: 2026-07-20 — **scaffold complete and running locally.**
 **Verified working locally:** `/health` returns ok · `trpc/health.ping` returns ok · `trpc/health.db` reads 1 organization from Postgres · frontend renders live status with no console errors · production build passes with **89 kB gzipped JS** (budget: 180 kB).
 
 ### 2. Multi-tenant foundation (blocks everything else)
-- [ ] `organizations`, `branches`, `users` schema + migrations
-- [ ] Self-service signup flow (with referral code capture)
-- [ ] JWT auth (owner/manager: password; cashier: PIN, device-bound)
-- [ ] Device registration + owner-side revocation
-- [ ] Tenant-scoping Fastify middleware
-- [ ] Postgres Row-Level Security policies
-- [ ] Tenant-isolation automated test suite (two orgs, assert no cross-access)
-- [ ] Hard-reset-on-logout/org-switch behavior
-- [ ] Role-based permission checks (owner/manager/cashier)
+- [x] `organizations`, `branches`, `users`, `devices` schema + migrations
+- [x] Self-service signup flow (with referral code capture, 30-day trial, atomic org+branch+owner creation)
+- [x] JWT auth — owner/manager: email + password; cashier: PIN, rate-limited
+- [x] Device registration + owner-side remote revocation (kills the session on the next request, not at token expiry)
+- [x] Tenant-scoping layer (`backend/src/lib/tenant-db.ts`) — auto-filters every Prisma query, fails closed on unknown operations
+- [x] Role-based permission checks (`ownerProcedure` / `managerProcedure`)
+- [x] Subscription lock — a LOCKED/CANCELLED tenant becomes read-only (mutations refused, reads still allowed)
+- [x] Tenant-isolation automated test suite — 14 tests covering reads, writes, and guard rails
+- [x] Auth test suite — 19 tests covering signup, login, PIN login, rate limiting, revocation, permissions, lock
+- [ ] **Postgres Row-Level Security policies** — deliberately deferred, see note below
+- [ ] Hard-reset-on-logout/org-switch behavior (needs the frontend auth UI first)
+- [ ] Frontend auth UI (signup, owner login, cashier PIN screen)
+
+> **On the deferred RLS layer.** The app-level scoping above is implemented and
+> tested. RLS was meant to sit *underneath* it as a second net. Doing it properly
+> requires a dedicated non-owner Postgres role plus routing every tenant query
+> through a transaction that sets a session variable — a real architectural
+> change with a performance cost. Half-doing it (policies enabled while the app
+> connects as the table owner, which bypasses RLS) would give false confidence,
+> which is worse than not having it. Scheduled as its own focused piece of work.
 
 ### 3. Super-admin panel v1
 - [ ] Organization list view
