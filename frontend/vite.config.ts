@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  appType: 'spa', // serve index.html for all unknown paths (e.g. /receipt/:id)
   server: {
     port: 5173,
   },

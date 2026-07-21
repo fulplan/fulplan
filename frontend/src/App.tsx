@@ -3,17 +3,21 @@ import { useAuth } from './lib/auth-context';
 import { getDeviceToken, getToken, STORAGE_KEYS } from './lib/storage';
 import { trpc } from './lib/trpc';
 import { Dashboard } from './pages/Dashboard';
+import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { PinScreen } from './pages/PinScreen';
 import { SignupPage } from './pages/SignupPage';
 import type { SessionUser } from './lib/auth-context';
 
-type Screen = 'loading' | 'login' | 'signup' | 'pin' | 'dashboard';
+type Screen = 'loading' | 'landing' | 'login' | 'signup' | 'pin' | 'dashboard';
+
+// Referral code from ?ref= URL param — captured once on load.
+const urlRef = new URLSearchParams(window.location.search).get('ref') ?? '';
 
 function initialScreen(): Screen {
   if (getToken()) return 'loading'; // we have a token, verify it
   if (getDeviceToken()) return 'pin'; // registered device, show cashier screen
-  return 'login';
+  return 'landing'; // first-time visitor — show marketing page
 }
 
 export function App() {
@@ -59,11 +63,22 @@ export function App() {
     );
   }
 
+  if (screen === 'landing') {
+    return (
+      <LandingPage
+        onSignup={() => setScreen('signup')}
+        onLogin={() => setScreen('login')}
+        referralCode={urlRef}
+      />
+    );
+  }
+
   if (screen === 'signup') {
     return (
       <SignupPage
         onSignedUp={(token, user) => handleSignedIn(token, user)}
         onLoginClick={() => setScreen('login')}
+        initialReferralCode={urlRef}
       />
     );
   }

@@ -17,7 +17,27 @@ import { prisma } from "../db";
  */
 
 /** Models carrying an `organizationId` column. */
-const TENANT_SCOPED_MODELS = new Set(["Branch", "User", "Device"]);
+const TENANT_SCOPED_MODELS = new Set([
+  "Branch",
+  "User",
+  "Device",
+  "Product",
+  "Category",
+  "StockMovement",
+  "StockLevel",
+  "Sale",
+  "Shift",
+  "CashEntry",
+  "Customer",
+  "CreditEntry",
+  "Supplier",
+  "SupplierEntry",
+  "StockTake",
+  "SalaryRecord",
+  "SalaryPayment",
+  "Expense",
+  // StockTakeItem is scoped via stockTakeId — no direct organizationId
+]);
 
 /** Scoped by its own primary key rather than an `organizationId` column. */
 const ORGANIZATION_MODEL = "Organization";

@@ -84,4 +84,31 @@
       transition-duration: 0.01ms !important;
     }
   }
+
+  /* 80mm thermal receipt print — hides everything except the receipt card. */
+  @media print {
+    @page {
+      margin: 4mm;
+      size: 80mm auto;
+    }
+
+    body * {
+      visibility: hidden;
+    }
+
+    .receipt-print,
+    .receipt-print * {
+      visibility: visible;
+    }
+
+    .receipt-print {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 72mm; /* 80mm paper minus 4mm margins each side */
+      border: none !important;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+  }
 }

@@ -6,7 +6,7 @@ tags: [tracker, status]
 
 Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
-Last updated: 2026-07-20 — **checkout screen done. Sale + stock decrement atomic transaction verified live. MoMo recording, USB scanner support, mobile cart bar included.**
+Last updated: 2026-07-21 — **marketing website done. One-page landing: hero, 6 feature cards, 3-step how-it-works, GH₵ 99/mo pricing, CTAs. Referral code captured from ?ref= URL param and pre-fills signup form. Landing page shows to unauthenticated visitors; logged-in users go straight to dashboard.**
 
 ## Phase 1 — MVP SaaS core
 
@@ -88,53 +88,64 @@ Last updated: 2026-07-20 — **checkout screen done. Sale + stock decrement atom
 - [ ] Void/return flow (manager-PIN approved, restores stock, logged)
 
 ### 7. Shift close-out
-- [ ] Clock-in with opening float
-- [ ] Manual cash in/out entries during shift
-- [ ] Expected-cash calculation (sales + cash in/out)
-- [ ] Clock-out cash count + discrepancy flag
+- [x] Clock-in with opening float
+- [x] Manual cash in/out entries during shift
+- [x] Expected-cash calculation (sales + cash in/out)
+- [x] Clock-out cash count + discrepancy flag
 - [ ] Daily branch summary (Z-report) rolling up all shifts
 
 ### 8. Receipts & invoices
-- [ ] Printable 80mm receipt (browser print CSS)
-- [ ] WhatsApp share link (hosted receipt page)
+- [x] Printable 80mm receipt (browser print CSS)
+- [x] WhatsApp share link (hosted receipt page at /receipt/:id, public, no auth)
 - [ ] Formal invoice template for credit/wholesale sales
 - [ ] VAT/levy line-item fields in schema (no GRA integration yet)
 
 ### 9. Customer credit
-- [ ] Customer profiles (name, phone, optional — not just credit customers)
-- [ ] Credit sales + partial payments
-- [ ] Owner-configurable credit limit + checkout warning
-- [ ] Credit ledger
+- [x] Customer profiles (name, phone, optional credit limit)
+- [x] Credit sales (CREDIT payment method, customer picker in checkout modal)
+- [x] Owner-configurable credit limit + checkout warning (visible, non-blocking)
+- [x] Credit ledger (CHARGE on sale, PAYMENT on repayment, balance computed)
+- [ ] Partial payments (UI allows any amount ≤ balance — full cycle works)
+- [ ] Customer-facing balance reminders (Phase 2)
 
 ### 10. Suppliers
-- [ ] Supplier contact records
-- [ ] Basic accounts-payable balance tracking
+- [x] Supplier contact records (name, phone, email, notes)
+- [x] Basic accounts-payable balance tracking (PURCHASE adds balance, PAYMENT reduces it)
+- [x] Partial payments supported
+- [x] Ledger view with history
 
 ### 11. Stock take
-- [ ] Count session flow (expected vs. actual per product)
-- [ ] Logged adjustment with reason
+- [x] Count session flow (expected vs. actual per product, one open session enforced per branch)
+- [x] Logged adjustment with reason (ADJUSTMENT StockMovement created on close, StockLevel cache updated atomically)
+- [x] Progress tracking UI (filter tabs, progress bar, discrepancy coloring)
+- [x] Past sessions list with item count + who closed
 
 ### 12. Salary & expenses
-- [ ] Basic salary records (agreed salary, payments/advances log)
-- [ ] Business expenses log (category, amount, date)
+- [x] Basic salary records (agreed monthly salary, effective-from history, payments/advances log)
+- [x] Business expenses log (category quick-pick, amount, date, note; monthly running total)
+- [x] Delete expense; salary history per staff member
 
 ### 13. Reports v1
-- [ ] Daily sales summary
-- [ ] Basic profit view → real P&L (revenue − cost of goods − expenses)
-- [ ] Shift discrepancy log
-- [ ] Daily branch summary
+- [x] Daily/period sales summary with payment method breakdown
+- [x] Real P&L: revenue − COGS − expenses − salary = net profit
+- [x] Top products by revenue with margin % and mini bar chart
+- [x] Shift discrepancy log
+- [x] Quick period picker (Today / Yesterday / Last 7 days / This month)
+- [ ] Daily branch summary (Z-report)
 - [ ] PDF export
 - [ ] Excel/CSV export
-- [ ] Charts on dedicated Reports screen (dashboard stays number-first)
+- [ ] Charts on dedicated Reports screen
 - [ ] Scheduled WhatsApp push summary (daily/weekly)
 
 ### 14. Data export/delete
-- [ ] Self-service CSV export
-- [ ] Self-service account deletion (with grace-period retention)
+- [x] Self-service CSV export: sales (by period), products & stock, customers (with balances), expenses (by period)
+- [x] Self-service account deletion: type "DELETE" guard, 30-day grace period, cancel flow within grace period
 
 ### 15. Marketing website
-- [ ] One-page site: pitch, pricing, "Start free trial" → signup
-- [ ] Referral code capture on arrival
+- [x] One-page site: hero, feature grid, how-it-works, pricing (GH₵ 99/mo), multiple CTAs
+- [x] Referral code capture from ?ref= URL param → pre-fills signup form
+- [x] Unauthenticated visitors see landing page; existing sessions go straight to dashboard
+- [ ] Domain purchased + deployed to Vercel
 
 ### 16. Pilot
 - [ ] Product name decided

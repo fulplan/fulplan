@@ -5,15 +5,16 @@ import { trpc } from '../lib/trpc';
 interface Props {
   onSignedUp: (token: string, user: SessionUser) => void;
   onLoginClick: () => void;
+  initialReferralCode?: string;
 }
 
-export function SignupPage({ onSignedUp, onLoginClick }: Props) {
+export function SignupPage({ onSignedUp, onLoginClick, initialReferralCode = '' }: Props) {
   const [shopName, setShopName] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [branchName, setBranchName] = useState('Main Branch');
-  const [referralCode, setReferralCode] = useState('');
+  const [referralCode, setReferralCode] = useState(initialReferralCode);
   const [error, setError] = useState('');
 
   const signupMutation = trpc.auth.signup.useMutation({
@@ -24,7 +25,7 @@ export function SignupPage({ onSignedUp, onLoginClick }: Props) {
         role: 'OWNER',
         organizationId: data.organization.id,
         organizationName: data.organization.name,
-        branchId: null, // populated on next load via auth.me
+        branchId: data.user.branchId,
       });
     },
     onError(err) {

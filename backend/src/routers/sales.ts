@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { router, tenantProcedure } from "../trpc";
+import { publicProcedure, router, tenantProcedure } from "../trpc";
 
 export const salesRouter = router({
   /**
@@ -17,8 +17,11 @@ export const salesRouter = router({
     .input(
       z.object({
         branchId: z.string(),
-        paymentMethod: z.enum(["CASH", "MOMO"]),
-        amountTendered: z.number().int().positive(),
+        paymentMethod: z.enum(["CASH", "MOMO", "CREDIT"]),
+        // For CASH/MOMO — must be >= total. For CREDIT — omit or pass 0.
+        amountTendered: z.number().int().nonnegative().default(0),
+        // Required when paymentMethod === "CREDIT"
+        customerId: z.string().optional(),
         items: z
           .array(
             z.object({
@@ -32,6 +35,25 @@ export const salesRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const orgId = ctx.auth.organizationId;
+
+      // Validate credit sales have a customer
+      if (input.paymentMethod === "CREDIT" && !input.customerId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "A customer must be selected for credit sales",
+        });
+      }
+
+      // Validate customer belongs to this org
+      if (input.customerId) {
+        const customer = await ctx.prisma.customer.findFirst({
+          where: { id: input.customerId, organizationId: orgId },
+          select: { id: true },
+        });
+        if (!customer) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Customer not found" });
+        }
+      }
 
       // ── 1. Load product snapshots ──────────────────────────────────────────
       const productIds = input.items.map((i) => i.productId);
@@ -68,17 +90,18 @@ export const salesRouter = router({
 
       const subtotal = lineItems.reduce((sum, i) => sum + i.lineTotal, 0);
       const total = subtotal; // no discounts at MVP
-      const change =
-        input.paymentMethod === "CASH"
-          ? Math.max(0, input.amountTendered - total)
-          : 0;
 
-      if (input.amountTendered < total) {
+      if (input.paymentMethod !== "CREDIT" && input.amountTendered < total) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Amount tendered is less than the total",
         });
       }
+
+      const change =
+        input.paymentMethod === "CASH"
+          ? Math.max(0, input.amountTendered - total)
+          : 0;
 
       // ── 2. Atomic transaction ───────────────────────────────────────────────
       const sale = await ctx.prisma.$transaction(async (tx) => {
@@ -89,9 +112,10 @@ export const salesRouter = router({
             branchId: input.branchId,
             cashierId: ctx.auth.userId,
             paymentMethod: input.paymentMethod,
+            customerId: input.customerId,
             subtotal,
             total,
-            amountTendered: input.amountTendered,
+            amountTendered: input.paymentMethod === "CREDIT" ? 0 : input.amountTendered,
             change,
             note: input.note,
             items: {
@@ -107,7 +131,7 @@ export const salesRouter = router({
           },
         });
 
-        // Stock movements + level updates (one loop = sequential awaits inside tx)
+        // Stock movements + level updates
         for (const li of lineItems) {
           await tx.stockMovement.create({
             data: {
@@ -138,6 +162,21 @@ export const salesRouter = router({
           });
         }
 
+        // For credit sales, append a CHARGE entry to the customer's ledger
+        if (input.paymentMethod === "CREDIT" && input.customerId) {
+          await tx.creditEntry.create({
+            data: {
+              organizationId: orgId,
+              customerId: input.customerId,
+              type: "CHARGE",
+              amount: total,
+              saleId: sale.id,
+              note: input.note,
+              createdById: ctx.auth.userId,
+            },
+          });
+        }
+
         return sale;
       });
 
@@ -150,6 +189,45 @@ export const salesRouter = router({
       };
     }),
 
+  /**
+   * Public receipt lookup — no auth required.
+   * The sale CUID is unguessable; the route is intentionally open so WhatsApp/
+   * browser share links work without a login wall.
+   */
+  receipt: publicProcedure
+    .input(z.object({ saleId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const sale = await ctx.prisma.sale.findUnique({
+        where: { id: input.saleId },
+        select: {
+          id: true,
+          total: true,
+          subtotal: true,
+          discountTotal: true,
+          amountTendered: true,
+          change: true,
+          paymentMethod: true,
+          createdAt: true,
+          cashier: { select: { name: true } },
+          branch: { select: { name: true, receiptHeader: true } },
+          organization: { select: { name: true } },
+          items: {
+            select: {
+              name: true,
+              quantity: true,
+              unitPrice: true,
+              lineTotal: true,
+            },
+            orderBy: { name: "asc" },
+          },
+        },
+      });
+      if (!sale) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Receipt not found" });
+      }
+      return sale;
+    }),
+
   /** Recent sales for a branch — cashiers see their own, managers see all. */
   list: tenantProcedure
     .input(
@@ -159,8 +237,9 @@ export const salesRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      return ctx.db.sale.findMany({
+      return ctx.prisma.sale.findMany({
         where: {
+          organizationId: ctx.auth.organizationId,
           ...(input.branchId ? { branchId: input.branchId } : {}),
           status: "COMPLETED",
         },

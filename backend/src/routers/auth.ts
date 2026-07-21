@@ -127,6 +127,7 @@ export const authRouter = router({
           id: organization.owner.id,
           name: organization.owner.name,
           role: "OWNER" as const,
+          branchId: organization.branch.id,
         },
         organization: {
           id: organization.org.id,
@@ -231,7 +232,7 @@ export const authRouter = router({
         status: "ok" as const,
         token,
         deviceToken: device?.deviceToken ?? null,
-        user: { id: user.id, name: user.name, role: user.role },
+        user: { id: user.id, name: user.name, role: user.role, branchId: user.branchId },
         organization: {
           id: user.organization.id,
           name: user.organization.name,
@@ -308,7 +309,7 @@ export const authRouter = router({
       return {
         token,
         deviceToken: device?.deviceToken ?? null,
-        user: { id: user.id, name: user.name, role: user.role },
+        user: { id: user.id, name: user.name, role: user.role, branchId: user.branchId },
         organization: { id: user.organization.id, name: user.organization.name },
       };
     }),

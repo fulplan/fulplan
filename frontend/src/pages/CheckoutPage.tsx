@@ -23,8 +23,9 @@ interface SaleResult {
   id: string;
   total: number;
   change: number;
-  paymentMethod: 'CASH' | 'MOMO';
+  paymentMethod: 'CASH' | 'MOMO' | 'CREDIT';
   createdAt: Date;
+  customerName?: string;
 }
 
 type ProductRow = {
@@ -160,6 +161,86 @@ function CartPanel({
   );
 }
 
+// ── Customer picker (used inside PaymentModal for credit sales) ───────────────
+
+function CustomerPicker({
+  value,
+  onChange,
+}: {
+  value: { id: string; name: string; balance: number; creditLimit: number | null } | null;
+  onChange: (c: { id: string; name: string; balance: number; creditLimit: number | null } | null) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [open, setOpen] = useState(false);
+
+  const { data } = trpc.customers.list.useQuery(
+    { search: search || undefined, activeOnly: true, limit: 20 },
+    { enabled: open },
+  );
+
+  return (
+    <div className="mb-4">
+      <label className="mb-1.5 block text-sm font-medium">Customer</label>
+      {value ? (
+        <div className="flex items-center justify-between border-2 border-ink bg-field px-3 py-2">
+          <div>
+            <span className="text-sm font-semibold">{value.name}</span>
+            {value.balance > 0 && (
+              <span className="ml-2 text-xs text-danger">
+                owes {formatGhs(value.balance)}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => { onChange(null); setSearch(''); setOpen(false); }}
+            className="text-sm text-muted hover:text-danger"
+          >
+            ×
+          </button>
+        </div>
+      ) : (
+        <div className="relative">
+          <input
+            type="search"
+            placeholder="Search by name or phone…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+            className="w-full border-2 border-ink bg-field px-3 py-2 text-sm focus:outline-none"
+          />
+          {open && data && data.customers.length > 0 && (
+            <div className="absolute z-10 w-full border border-line bg-paper shadow-md">
+              {data.customers.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-field"
+                  onClick={() => {
+                    onChange({ id: c.id, name: c.name, balance: c.balance, creditLimit: c.creditLimit });
+                    setSearch('');
+                    setOpen(false);
+                  }}
+                >
+                  <span>{c.name}{c.phone ? ` · ${c.phone}` : ''}</span>
+                  {c.balance > 0 && (
+                    <span className="text-xs text-danger">owes {formatGhs(c.balance)}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+          {open && data && data.customers.length === 0 && search && (
+            <div className="absolute z-10 w-full border border-line bg-paper px-3 py-2 text-sm text-muted shadow-md">
+              No customers found — add them in the Customers page.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Payment modal ─────────────────────────────────────────────────────────────
 
 function PaymentModal({
@@ -175,9 +256,12 @@ function PaymentModal({
   onComplete: (sale: SaleResult) => void;
   onClose: () => void;
 }) {
-  const [method, setMethod] = useState<'CASH' | 'MOMO'>('CASH');
+  const [method, setMethod] = useState<'CASH' | 'MOMO' | 'CREDIT'>('CASH');
   const [tenderedStr, setTenderedStr] = useState('');
   const [error, setError] = useState('');
+  const [customer, setCustomer] = useState<{
+    id: string; name: string; balance: number; creditLimit: number | null;
+  } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -188,8 +272,9 @@ function PaymentModal({
     onSuccess(data) {
       onComplete({
         ...data,
-        paymentMethod: data.paymentMethod as 'CASH' | 'MOMO',
+        paymentMethod: data.paymentMethod as 'CASH' | 'MOMO' | 'CREDIT',
         createdAt: new Date(data.createdAt),
+        customerName: customer?.name,
       });
     },
     onError(err) {
@@ -199,17 +284,28 @@ function PaymentModal({
 
   const tenderedPesewas = Math.round(parseFloat(tenderedStr || '0') * 100);
   const change = method === 'CASH' ? Math.max(0, tenderedPesewas - total) : 0;
+
+  // Credit limit warning: warn if this sale would push balance over limit
+  const newBalance = customer ? customer.balance + total : 0;
+  const overLimit = customer?.creditLimit != null && newBalance > customer.creditLimit;
+
   const canConfirm =
     method === 'MOMO' ||
+    method === 'CREDIT' ||
     (tenderedPesewas >= total && tenderedPesewas > 0);
 
   function confirm() {
     if (!canConfirm) return;
+    if (method === 'CREDIT' && !customer) {
+      setError('Select a customer for a credit sale');
+      return;
+    }
     setError('');
     completeMutation.mutate({
       branchId,
       paymentMethod: method,
-      amountTendered: method === 'MOMO' ? total : tenderedPesewas,
+      amountTendered: method === 'CASH' ? tenderedPesewas : 0,
+      customerId: method === 'CREDIT' ? customer!.id : undefined,
       items: cartItems.map((i) => ({
         productId: i.productId,
         quantity: i.quantity,
@@ -232,8 +328,8 @@ function PaymentModal({
 
         <div className="px-5 py-4">
           {/* Payment method toggle */}
-          <div className="mb-5 grid grid-cols-2 border-2 border-ink">
-            {(['CASH', 'MOMO'] as const).map((m) => (
+          <div className="mb-5 grid grid-cols-3 border-2 border-ink">
+            {(['CASH', 'MOMO', 'CREDIT'] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => { setMethod(m); setError(''); }}
@@ -242,7 +338,7 @@ function PaymentModal({
                   method === m ? 'bg-ink text-paper' : 'bg-paper text-ink hover:bg-field',
                 ].join(' ')}
               >
-                {m === 'CASH' ? 'Cash' : 'MoMo'}
+                {m === 'CASH' ? 'Cash' : m === 'MOMO' ? 'MoMo' : 'Credit'}
               </button>
             ))}
           </div>
@@ -285,6 +381,19 @@ function PaymentModal({
             </div>
           )}
 
+          {/* Credit: customer picker + limit warning */}
+          {method === 'CREDIT' && (
+            <div className="mb-4">
+              <CustomerPicker value={customer} onChange={setCustomer} />
+              {customer && overLimit && (
+                <div className="border border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Warning: this sale would bring their balance to {formatGhs(newBalance)},
+                  over their {formatGhs(customer.creditLimit!)} limit.
+                </div>
+              )}
+            </div>
+          )}
+
           {error && (
             <p className="mb-3 text-sm text-danger">{error}</p>
           )}
@@ -315,11 +424,16 @@ function PaymentModal({
 
 function ReceiptSummary({
   sale,
+  shopName,
   onNewSale,
 }: {
   sale: SaleResult;
+  shopName: string;
   onNewSale: () => void;
 }) {
+  const receiptUrl = `${window.location.origin}/receipt/${sale.id}`;
+  const waUrl = `https://wa.me/?text=${encodeURIComponent(`Your receipt from ${shopName}: ${receiptUrl}`)}`;
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-6">
       <div className="w-full max-w-sm border-2 border-brand">
@@ -333,7 +447,13 @@ function ReceiptSummary({
             {sale.paymentMethod === 'CASH' && sale.change > 0 && (
               <Row label="Change" value={formatGhs(sale.change)} />
             )}
-            <Row label="Method" value={sale.paymentMethod === 'CASH' ? 'Cash' : 'MoMo'} />
+            <Row
+              label="Method"
+              value={sale.paymentMethod === 'CASH' ? 'Cash' : sale.paymentMethod === 'MOMO' ? 'MoMo' : 'Credit'}
+            />
+            {sale.customerName && (
+              <Row label="Customer" value={sale.customerName} />
+            )}
             <Row
               label="Time"
               value={sale.createdAt.toLocaleTimeString([], {
@@ -342,9 +462,29 @@ function ReceiptSummary({
               })}
             />
           </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <a
+              href={receiptUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center border border-line py-3 text-sm font-medium hover:bg-field"
+            >
+              View receipt
+            </a>
+            <a
+              href={waUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center bg-brand py-3 text-sm font-semibold text-paper hover:opacity-90"
+            >
+              Share via WA
+            </a>
+          </div>
+
           <button
             onClick={onNewSale}
-            className="mt-6 w-full bg-ink py-4 text-base font-semibold text-paper hover:opacity-90"
+            className="mt-3 w-full bg-ink py-4 text-base font-semibold text-paper hover:opacity-90"
             autoFocus
           >
             New sale
@@ -589,7 +729,11 @@ export function CheckoutPage() {
   if (lastSale) {
     return (
       <div className="flex h-[calc(100dvh-49px)] flex-col">
-        <ReceiptSummary sale={lastSale} onNewSale={startNewSale} />
+        <ReceiptSummary
+          sale={lastSale}
+          shopName={user?.organizationName ?? ''}
+          onNewSale={startNewSale}
+        />
       </div>
     );
   }

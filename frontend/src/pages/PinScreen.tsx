@@ -35,7 +35,7 @@ export function PinScreen({ onSignedIn, onOwnerLoginClick }: Props) {
           role: data.user.role,
           organizationId: data.organization.id,
           organizationName: data.organization.name,
-          branchId: null, // populated on next load via auth.me
+          branchId: data.user.branchId,
         },
         data.deviceToken,
       );

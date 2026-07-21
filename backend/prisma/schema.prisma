@@ -56,6 +56,16 @@ model Organization {
   stockLevels    StockLevel[]
   stockMovements StockMovement[]
   sales          Sale[]
+  shifts         Shift[]
+  cashEntries    CashEntry[]
+  customers        Customer[]
+  creditEntries    CreditEntry[]
+  suppliers        Supplier[]
+  supplierEntries  SupplierEntry[]
+  stockTakes       StockTake[]
+  salaryRecords    SalaryRecord[]
+  salaryPayments   SalaryPayment[]
+  expenses         Expense[]
 
   @@index([subscriptionStatus])
   @@map("organizations")
@@ -81,6 +91,9 @@ model Branch {
   stockLevels    StockLevel[]
   stockMovements StockMovement[]
   sales          Sale[]
+  shifts         Shift[]
+  stockTakes     StockTake[]
+  expenses       Expense[]
 
   @@index([organizationId])
   @@map("branches")
@@ -117,6 +130,17 @@ model User {
   stockMovements StockMovement[]
   sales          Sale[]          @relation("SaleCashier")
   voidedSales    Sale[]          @relation("SaleVoidedBy")
+  shifts         Shift[]         @relation("ShiftCashier")
+  cashEntries    CashEntry[]
+  creditEntries        CreditEntry[]
+  supplierEntries      SupplierEntry[]
+  createdStockTakes    StockTake[] @relation("StockTakeCreated")
+  closedStockTakes     StockTake[] @relation("StockTakeClosed")
+  salaryRecords        SalaryRecord[] @relation("SalaryEmployee")
+  createdSalaryRecords SalaryRecord[] @relation("SalaryRecordCreated")
+  salaryPayments       SalaryPayment[] @relation("SalaryPaymentEmployee")
+  createdSalaryPayments SalaryPayment[] @relation("SalaryPaymentCreated")
+  expenses             Expense[]
 
   // Email is unique per tenant, not globally — the same person could own
   // two separate shop businesses on the platform.
@@ -158,6 +182,37 @@ enum SaleStatus {
 enum PaymentMethod {
   CASH
   MOMO
+  CREDIT // book sale on customer's tab
+}
+
+enum CreditEntryType {
+  CHARGE  // credit sale added to balance
+  PAYMENT // repayment reducing balance
+}
+
+enum SupplierEntryType {
+  PURCHASE // stock bought on credit — we owe them
+  PAYMENT  // money paid to supplier — reduces balance
+}
+
+enum StockTakeStatus {
+  OPEN   // count in progress
+  CLOSED // finalized; adjustments applied
+}
+
+enum SalaryPaymentType {
+  PAYMENT // full or partial month salary paid
+  ADVANCE // advance against future salary
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+enum CashEntryType {
+  IN  // cash added to till (e.g. change float top-up)
+  OUT // cash removed from till (e.g. owner takes expenses)
 }
 
 /// A sellable item.
@@ -198,6 +253,7 @@ model Product {
   stockLevels    StockLevel[]
   stockMovements StockMovement[]
   saleItems      SaleItem[]
+  stockTakeItems StockTakeItem[]
 
   @@index([organizationId])
   @@index([organizationId, barcode])
@@ -293,6 +349,10 @@ model Sale {
   status        SaleStatus    @default(COMPLETED)
   paymentMethod PaymentMethod
 
+  // For credit sales — links to the customer's account.
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
   // All amounts in PESEWAS.
   subtotal       Int
   discountTotal  Int @default(0)
@@ -311,6 +371,7 @@ model Sale {
 
   items          SaleItem[]
   stockMovements StockMovement[]
+  creditEntries  CreditEntry[]
 
   @@index([organizationId])
   @@index([organizationId, branchId, createdAt])
@@ -335,4 +396,277 @@ model SaleItem {
   @@index([saleId])
   @@index([productId])
   @@map("sale_items")
+}
+
+/// A cashier's till shift. One open shift per branch at a time.
+/// The discrepancy between expected and counted cash is the till-theft signal.
+model Shift {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  branchId  String
+  branch    Branch @relation(fields: [branchId], references: [id])
+  cashierId String
+  cashier   User   @relation("ShiftCashier", fields: [cashierId], references: [id])
+
+  status       ShiftStatus @default(OPEN)
+  openingFloat Int         // pesewas — cash in till at start of shift
+
+  // Computed and stored at close time so they don't change as history accumulates.
+  countedCash  Int?        // pesewas — cashier's physical count
+  expectedCash Int?        // pesewas = float + cash sales + cash entries net
+  discrepancy  Int?        // pesewas = counted - expected (negative = shortage)
+
+  openedAt DateTime  @default(now())
+  closedAt DateTime?
+  note     String?
+
+  cashEntries CashEntry[]
+
+  @@index([organizationId])
+  @@index([branchId, status])
+  @@index([organizationId, branchId, openedAt])
+  @@map("shifts")
+}
+
+/// A customer of the shop. Optional profile — any customer, not just credit customers.
+model Customer {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name  String
+  phone String?
+  notes String?
+
+  // null = no credit limit (unlimited). In pesewas.
+  creditLimit Int?
+
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sales         Sale[]
+  creditEntries CreditEntry[]
+
+  @@index([organizationId])
+  @@index([organizationId, phone])
+  @@map("customers")
+}
+
+/// Append-only credit ledger. CHARGE = sale booked on credit; PAYMENT = money received.
+/// Balance owed = sum(CHARGE amounts) − sum(PAYMENT amounts).
+model CreditEntry {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  type   CreditEntryType
+  amount Int             // pesewas, always positive — type determines direction
+
+  // Present when this entry was created by a credit sale.
+  saleId String?
+  sale   Sale?  @relation(fields: [saleId], references: [id], onDelete: SetNull)
+
+  note        String?
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([customerId])
+  @@map("credit_entries")
+}
+
+/// Manual cash in/out entries recorded during a shift (not from sales).
+/// Examples: owner removes GHS 50 for expenses; petty cash added to float.
+model CashEntry {
+  id             String       @id @default(cuid())
+  shiftId        String
+  shift          Shift        @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  type   CashEntryType
+  amount Int           // pesewas, always positive — type determines direction
+  note   String?
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([shiftId])
+  @@index([organizationId])
+  @@map("cash_entries")
+}
+
+/// A supplier the shop buys stock from.
+model Supplier {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name  String
+  phone String?
+  email String?
+  notes String?
+
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entries SupplierEntry[]
+
+  @@index([organizationId])
+  @@map("suppliers")
+}
+
+/// Append-only accounts-payable ledger.
+/// PURCHASE = we received goods on credit (we owe them more).
+/// PAYMENT  = we paid them (reduces balance).
+/// Balance owed = sum(PURCHASE amounts) − sum(PAYMENT amounts).
+model SupplierEntry {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+
+  type   SupplierEntryType
+  amount Int               // pesewas, always positive
+
+  note        String?
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([supplierId])
+  @@map("supplier_entries")
+}
+
+/// A periodic stock count session for a branch.
+/// On close: ADJUSTMENT movements are appended for every discrepancy,
+/// and stock_levels cache is updated atomically.
+model StockTake {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  status StockTakeStatus @default(OPEN)
+  note   String?
+
+  createdById String
+  createdBy   User   @relation("StockTakeCreated", fields: [createdById], references: [id])
+
+  closedById String?
+  closedBy   User?  @relation("StockTakeClosed", fields: [closedById], references: [id])
+  closedAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  items StockTakeItem[]
+
+  @@index([organizationId])
+  @@index([organizationId, branchId, status])
+  @@map("stock_takes")
+}
+
+/// One line per product in a stock take session.
+/// expectedQty is a snapshot from stock_levels at session open time.
+/// countedQty is null until the user enters a count.
+model StockTakeItem {
+  id          String    @id @default(cuid())
+  stockTakeId String
+  stockTake   StockTake @relation(fields: [stockTakeId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  name        String // product name snapshot
+  expectedQty Int    // stock level at session start
+  countedQty  Int?   // null = not yet counted
+
+  @@unique([stockTakeId, productId])
+  @@index([stockTakeId])
+  @@map("stock_take_items")
+}
+
+/// The agreed monthly salary for a staff member at a point in time.
+/// Multiple records capture salary changes; the most recent is current.
+model SalaryRecord {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("SalaryEmployee", fields: [userId], references: [id])
+
+  agreedAmount  Int      // pesewas per month
+  effectiveFrom DateTime @default(now())
+  note          String?
+
+  createdAt   DateTime @default(now())
+  createdById String
+  createdBy   User     @relation("SalaryRecordCreated", fields: [createdById], references: [id])
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("salary_records")
+}
+
+/// A salary payment or advance made to a staff member.
+model SalaryPayment {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("SalaryPaymentEmployee", fields: [userId], references: [id])
+
+  type   SalaryPaymentType
+  amount Int               // pesewas, always positive
+  paidAt DateTime          @default(now())
+  note   String?
+
+  createdAt   DateTime @default(now())
+  createdById String
+  createdBy   User     @relation("SalaryPaymentCreated", fields: [createdById], references: [id])
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("salary_payments")
+}
+
+/// A business expense (rent, electricity, transport, supplies, etc.).
+model Expense {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  category String  // free-text: Rent, Electricity, Transport, …
+  amount   Int     // pesewas
+  paidAt   DateTime @default(now())
+  note     String?
+
+  createdAt   DateTime @default(now())
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
+  @@index([organizationId])
+  @@index([organizationId, paidAt])
+  @@map("expenses")
 }
