@@ -103,7 +103,9 @@ function ghs(pesewas: number) {
 }
 
 function DashboardHome() {
-  const { data, isLoading } = trpc.reports.dashboard.useQuery({ branchId: undefined });
+  const [branchId, setBranchId] = useState<string | undefined>(undefined);
+  const { data: branches } = trpc.branches.list.useQuery();
+  const { data, isLoading } = trpc.reports.dashboard.useQuery({ branchId });
 
   if (isLoading) {
     return <div className="p-5 text-sm text-muted">Loading…</div>;
@@ -113,9 +115,38 @@ function DashboardHome() {
 
   const { today, discrepancyAlerts, lowStock } = data;
   const hasAlerts = discrepancyAlerts.length > 0 || lowStock.length > 0;
+  const multiBranch = (branches?.length ?? 0) > 1;
 
   return (
     <div className="p-5 space-y-6 max-w-2xl">
+      {/* Branch selector — only shown when org has multiple branches */}
+      {multiBranch && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted uppercase tracking-wide shrink-0">Branch</span>
+          <div className="flex gap-1">
+            <button
+              onClick={() => setBranchId(undefined)}
+              className={`px-3 py-1 text-xs font-medium border ${
+                branchId === undefined ? 'bg-ink text-paper border-ink' : 'border-line hover:bg-field'
+              }`}
+            >
+              All
+            </button>
+            {branches?.map((b) => (
+              <button
+                key={b.id}
+                onClick={() => setBranchId(b.id)}
+                className={`px-3 py-1 text-xs font-medium border ${
+                  branchId === b.id ? 'bg-ink text-paper border-ink' : 'border-line hover:bg-field'
+                }`}
+              >
+                {b.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Today's snapshot */}
       <section>
         <p className="text-xs text-muted uppercase tracking-wide mb-3">Today</p>
