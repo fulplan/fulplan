@@ -48,7 +48,7 @@ function quickRange(period: QuickPeriod): { from: Date; to: Date } {
 
 export function ReportsPage() {
   const [quick, setQuick] = useState<QuickPeriod>("today");
-  const [tab, setTab] = useState<"summary" | "shifts" | "products" | "zreport">("summary");
+  const [tab, setTab] = useState<"summary" | "shifts" | "products" | "zreport" | "staff">("summary");
 
   const { from, to } = quickRange(quick);
   const range = isoRange(from, to);
@@ -87,6 +87,7 @@ export function ReportsPage() {
             { id: "summary", label: "P&L" },
             { id: "products", label: "Products" },
             { id: "shifts", label: "Shifts" },
+            { id: "staff", label: "Staff" },
             { id: "zreport", label: "Z-Report" },
           ] as const
         ).map((t) => (
@@ -106,6 +107,7 @@ export function ReportsPage() {
       {tab === "summary" && <SummaryTab range={range} />}
       {tab === "products" && <ProductsTab range={range} />}
       {tab === "shifts" && <ShiftsTab />}
+      {tab === "staff" && <StaffPerformanceTab range={range} />}
       {tab === "zreport" && <ZReportTab range={range} quick={quick} />}
     </div>
   );
@@ -374,6 +376,50 @@ function ShiftsTab() {
               </span>
             </div>
             {shift.note && <div className="text-xs text-muted mt-0.5">{shift.note}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Staff performance tab ─────────────────────────────────────────────────────
+
+function StaffPerformanceTab({ range }: { range: { from: string; to: string } }) {
+  const { data, isLoading } = trpc.reports.staffPerformance.useQuery(range);
+
+  if (isLoading) return <div className="text-sm text-muted">Loading…</div>;
+  if (!data || data.length === 0) {
+    return <div className="border border-line p-6 text-center text-sm text-muted">No sales in this period.</div>;
+  }
+
+  const maxRevenue = Math.max(...data.map((s) => s.revenue), 1);
+
+  return (
+    <div className="border border-line divide-y divide-line">
+      {data.map((s, i) => {
+        const avg = s.count > 0 ? Math.round(s.revenue / s.count) : 0;
+        return (
+          <div key={s.cashierId} className="px-4 py-3">
+            <div className="flex items-baseline justify-between mb-1">
+              <div className="flex items-baseline gap-2 min-w-0">
+                <span className="text-xs text-muted w-5 tabular-nums">{i + 1}.</span>
+                <span className="text-sm font-medium truncate">{s.name}</span>
+              </div>
+              <div className="text-right ml-4 shrink-0">
+                <span className="text-sm font-semibold tabular-nums">{formatMoney(s.revenue)}</span>
+                <span className="text-xs text-muted ml-2">{s.count} sales</span>
+              </div>
+            </div>
+            <div className="h-1 bg-line mt-1">
+              <div
+                className="h-1 bg-brand"
+                style={{ width: `${(s.revenue / maxRevenue) * 100}%` }}
+              />
+            </div>
+            <div className="text-xs text-muted mt-0.5">
+              Avg sale: {formatMoney(avg)}
+            </div>
           </div>
         );
       })}

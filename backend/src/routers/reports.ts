@@ -207,6 +207,52 @@ export const reportsRouter = router({
     }),
 
   /**
+   * Sales performance per cashier in a period.
+   */
+  staffPerformance: managerProcedure
+    .input(
+      z.object({
+        from: z.string().datetime(),
+        to: z.string().datetime(),
+        branchId: z.string().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const orgId = ctx.auth.organizationId;
+      const from = new Date(input.from);
+      const to = new Date(input.to);
+
+      const sales = await ctx.prisma.sale.findMany({
+        where: {
+          organizationId: orgId,
+          ...(input.branchId ? { branchId: input.branchId } : {}),
+          status: "COMPLETED",
+          createdAt: { gte: from, lte: to },
+        },
+        select: {
+          total: true,
+          cashierId: true,
+          cashier: { select: { name: true } },
+        },
+      });
+
+      const map = new Map<string, { name: string; count: number; revenue: number }>();
+      for (const s of sales) {
+        const existing = map.get(s.cashierId);
+        if (existing) {
+          existing.count += 1;
+          existing.revenue += s.total;
+        } else {
+          map.set(s.cashierId, { name: s.cashier.name, count: 1, revenue: s.total });
+        }
+      }
+
+      return Array.from(map.entries())
+        .map(([cashierId, v]) => ({ cashierId, ...v }))
+        .sort((a, b) => b.revenue - a.revenue);
+    }),
+
+  /**
    * Daily revenue breakdown for a period — used for the trend chart on the
    * Reports summary tab. Returns one entry per calendar day (UTC) in order.
    */
