@@ -59,9 +59,216 @@ export function SettingsPage() {
   return (
     <div className="p-4 max-w-2xl mx-auto space-y-8">
       <h1 className="text-xl font-bold">Settings</h1>
+      {isOwner && <OrgProfileSection />}
+      <BranchSettingsSection isOwner={isOwner} />
       <ExportSection />
       {isOwner && <DangerZone />}
     </div>
+  );
+}
+
+// ── Organisation profile ──────────────────────────────────────────────────────
+
+function OrgProfileSection() {
+  const utils = trpc.useUtils();
+  const { data } = trpc.account.getOrg.useQuery();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const update = trpc.account.updateOrgName.useMutation({
+    onSuccess: () => {
+      setEditing(false);
+      utils.account.getOrg.invalidate();
+    },
+    onError: (err) => setError(err.message),
+  });
+
+  function startEdit() {
+    setName(data?.name ?? "");
+    setEditing(true);
+    setError(null);
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) { setError("Name is required"); return; }
+    update.mutate({ name: name.trim() });
+  }
+
+  return (
+    <section>
+      <h2 className="font-semibold text-sm mb-3">Organisation</h2>
+      <div className="border border-line p-4">
+        {editing ? (
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div>
+              <label className="block text-xs text-muted mb-1">Business name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full border border-line px-3 py-2 text-sm"
+                maxLength={100}
+                autoFocus
+              />
+            </div>
+            {error && <p className="text-danger text-xs">{error}</p>}
+            <div className="flex gap-2">
+              <button type="submit" disabled={update.isPending} className="px-4 py-2 bg-ink text-paper text-sm font-semibold disabled:opacity-50">
+                {update.isPending ? "Saving…" : "Save"}
+              </button>
+              <button type="button" onClick={() => setEditing(false)} className="px-4 py-2 border border-line text-sm">
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted">Business name</p>
+              <p className="text-sm font-semibold mt-0.5">{data?.name ?? "—"}</p>
+            </div>
+            <button onClick={startEdit} className="px-3 py-1.5 border border-line text-sm hover:bg-field">
+              Edit
+            </button>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ── Branch settings ───────────────────────────────────────────────────────────
+
+function BranchSettingsSection({ isOwner }: { isOwner: boolean }) {
+  const utils = trpc.useUtils();
+  const { data: branches, isLoading } = trpc.branches.list.useQuery();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  const updateBranch = trpc.branches.update.useMutation({
+    onSuccess: () => { setEditingId(null); utils.branches.list.invalidate(); },
+  });
+  const createBranch = trpc.branches.create.useMutation({
+    onSuccess: () => { setAdding(false); utils.branches.list.invalidate(); },
+  });
+
+  if (isLoading) return null;
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-semibold text-sm">Branches</h2>
+        {isOwner && (
+          <button onClick={() => setAdding(true)} className="px-3 py-1 text-xs border border-ink font-medium hover:bg-field">
+            + Add branch
+          </button>
+        )}
+      </div>
+      <div className="border border-line divide-y divide-line">
+        {branches?.map((b) =>
+          editingId === b.id ? (
+            <BranchEditRow
+              key={b.id}
+              branch={b}
+              onSave={(data) => updateBranch.mutate({ branchId: b.id, ...data })}
+              onCancel={() => setEditingId(null)}
+              isSaving={updateBranch.isPending}
+            />
+          ) : (
+            <div key={b.id} className="flex items-start justify-between px-4 py-3">
+              <div>
+                <p className="text-sm font-medium">{b.name}</p>
+                {b.address && <p className="text-xs text-muted">{b.address}</p>}
+                {b.receiptHeader && <p className="text-xs text-muted italic">Header: {b.receiptHeader}</p>}
+              </div>
+              <button onClick={() => setEditingId(b.id)} className="text-xs text-muted hover:text-ink ml-4 shrink-0">
+                Edit
+              </button>
+            </div>
+          )
+        )}
+        {adding && (
+          <BranchEditRow
+            onSave={(data) => createBranch.mutate(data as { name: string; address?: string; receiptHeader?: string })}
+            onCancel={() => setAdding(false)}
+            isSaving={createBranch.isPending}
+          />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function BranchEditRow({
+  branch,
+  onSave,
+  onCancel,
+  isSaving,
+}: {
+  branch?: { name: string; address: string | null; receiptHeader: string | null };
+  onSave: (data: { name: string; address?: string; receiptHeader?: string }) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+}) {
+  const [name, setName] = useState(branch?.name ?? "");
+  const [address, setAddress] = useState(branch?.address ?? "");
+  const [header, setHeader] = useState(branch?.receiptHeader ?? "");
+  const [error, setError] = useState<string | null>(null);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) { setError("Name is required"); return; }
+    onSave({ name: name.trim(), address: address.trim() || undefined, receiptHeader: header.trim() || undefined });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="px-4 py-3 bg-field space-y-2">
+      <div>
+        <label className="block text-xs text-muted mb-1">Branch name *</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full border border-line px-2 py-1.5 text-sm"
+          placeholder="e.g. Main Store"
+          autoFocus
+          maxLength={100}
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-muted mb-1">Address</label>
+        <input
+          type="text"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          className="w-full border border-line px-2 py-1.5 text-sm"
+          placeholder="Optional"
+          maxLength={200}
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-muted mb-1">Receipt header</label>
+        <input
+          type="text"
+          value={header}
+          onChange={(e) => setHeader(e.target.value)}
+          className="w-full border border-line px-2 py-1.5 text-sm"
+          placeholder="Printed at top of receipts (optional)"
+          maxLength={200}
+        />
+      </div>
+      {error && <p className="text-danger text-xs">{error}</p>}
+      <div className="flex gap-2">
+        <button type="submit" disabled={isSaving} className="px-3 py-1.5 bg-ink text-paper text-sm font-semibold disabled:opacity-50">
+          {isSaving ? "Saving…" : "Save"}
+        </button>
+        <button type="button" onClick={onCancel} className="px-3 py-1.5 border border-line text-sm">
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 

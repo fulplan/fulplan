@@ -1,9 +1,29 @@
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import { router, ownerProcedure } from "../trpc";
 
 const GRACE_DAYS = 30;
 
 export const accountRouter = router({
+  /** Get / update the organization display name. */
+  getOrg: ownerProcedure.query(async ({ ctx }) => {
+    const org = await ctx.prisma.organization.findUniqueOrThrow({
+      where: { id: ctx.auth.organizationId },
+      select: { name: true },
+    });
+    return org;
+  }),
+
+  updateOrgName: ownerProcedure
+    .input(z.object({ name: z.string().trim().min(1).max(100) }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.organization.update({
+        where: { id: ctx.auth.organizationId },
+        data: { name: input.name },
+      });
+      return { ok: true };
+    }),
+
   /**
    * Current deletion status for the organization.
    * Returns null if not scheduled, or the scheduled deletion date.
