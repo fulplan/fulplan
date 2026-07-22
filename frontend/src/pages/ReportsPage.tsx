@@ -48,7 +48,7 @@ function quickRange(period: QuickPeriod): { from: Date; to: Date } {
 
 export function ReportsPage() {
   const [quick, setQuick] = useState<QuickPeriod>("today");
-  const [tab, setTab] = useState<"summary" | "shifts" | "products">("summary");
+  const [tab, setTab] = useState<"summary" | "shifts" | "products" | "zreport">("summary");
 
   const { from, to } = quickRange(quick);
   const range = isoRange(from, to);
@@ -81,17 +81,24 @@ export function ReportsPage() {
       </div>
 
       {/* Section tabs */}
-      <div className="flex gap-1 mb-5 border-b border-line">
-        {(["summary", "products", "shifts"] as const).map((t) => (
+      <div className="flex gap-1 mb-5 border-b border-line overflow-x-auto">
+        {(
+          [
+            { id: "summary", label: "P&L" },
+            { id: "products", label: "Products" },
+            { id: "shifts", label: "Shifts" },
+            { id: "zreport", label: "Z-Report" },
+          ] as const
+        ).map((t) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={t.id}
+            onClick={() => setTab(t.id)}
             className={[
-              "px-4 py-2 text-sm font-medium capitalize -mb-px",
-              tab === t ? "border-b-2 border-ink" : "text-muted hover:text-ink",
+              "px-4 py-2 text-sm font-medium shrink-0 -mb-px",
+              tab === t.id ? "border-b-2 border-ink" : "text-muted hover:text-ink",
             ].join(" ")}
           >
-            {t === "summary" ? "P&L Summary" : t === "products" ? "Top Products" : "Shift Log"}
+            {t.label}
           </button>
         ))}
       </div>
@@ -99,6 +106,7 @@ export function ReportsPage() {
       {tab === "summary" && <SummaryTab range={range} />}
       {tab === "products" && <ProductsTab range={range} />}
       {tab === "shifts" && <ShiftsTab />}
+      {tab === "zreport" && <ZReportTab range={range} quick={quick} />}
     </div>
   );
 }
@@ -369,6 +377,157 @@ function ShiftsTab() {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ── Z-Report tab ─────────────────────────────────────────────────────────────
+
+function ZReportTab({ range, quick }: { range: { from: string; to: string }; quick: QuickPeriod }) {
+  const { data: summary, isLoading: sumLoading } = trpc.reports.summary.useQuery(range);
+  const { data: topProds, isLoading: topLoading } = trpc.reports.topProducts.useQuery({ ...range, limit: 5 });
+  const { data: shifts, isLoading: shiftsLoading } = trpc.reports.shiftLog.useQuery({});
+
+  const isLoading = sumLoading || topLoading || shiftsLoading;
+  if (isLoading) return <div className="text-sm text-muted">Loading…</div>;
+  if (!summary) return null;
+
+  const now = new Date();
+  const periodLabel =
+    quick === "today" ? `${now.toLocaleDateString('en-GH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`
+    : quick === "yesterday" ? "Yesterday"
+    : quick === "week" ? "Last 7 days"
+    : "This month";
+
+  const margin = summary.revenue > 0 ? ((summary.grossProfit / summary.revenue) * 100).toFixed(1) : "0.0";
+
+  // Only show shifts for the period — use "today" or "yesterday" shifts
+  const periodShifts = (shifts ?? []).filter((s) => {
+    if (!s.closedAt) return false;
+    const closed = new Date(s.closedAt);
+    return closed >= new Date(range.from) && closed <= new Date(range.to);
+  });
+
+  return (
+    <div>
+      {/* Print button */}
+      <div className="flex justify-end mb-4 print:hidden">
+        <button
+          onClick={() => window.print()}
+          className="border border-ink px-4 py-2 text-sm font-medium hover:bg-field"
+        >
+          Print Z-Report
+        </button>
+      </div>
+
+      {/* Printable Z-report card */}
+      <div className="border-2 border-ink p-6 space-y-5 print:border-0 print:p-0">
+        {/* Header */}
+        <div className="text-center border-b border-line pb-4">
+          <p className="text-lg font-bold uppercase tracking-widest">Z-Report</p>
+          <p className="text-sm text-muted mt-1">{periodLabel}</p>
+          <p className="text-xs text-muted">Printed: {now.toLocaleString('en-GH')}</p>
+        </div>
+
+        {/* Sales summary */}
+        <div>
+          <p className="text-xs font-semibold uppercase text-muted mb-2">Sales Summary</p>
+          <div className="space-y-1">
+            <ZLine label="Transactions" value={String(summary.salesCount)} />
+            <ZLine label="Revenue" value={formatMoney(summary.revenue)} bold />
+            <ZLine label="  Cash" value={formatMoney(summary.byMethod.CASH)} small />
+            <ZLine label="  MoMo" value={formatMoney(summary.byMethod.MOMO)} small />
+            <ZLine label="  Credit" value={formatMoney(summary.byMethod.CREDIT)} small />
+          </div>
+        </div>
+
+        <div className="border-t border-line" />
+
+        {/* Profit */}
+        <div>
+          <p className="text-xs font-semibold uppercase text-muted mb-2">Profitability</p>
+          <div className="space-y-1">
+            <ZLine label="Revenue" value={formatMoney(summary.revenue)} />
+            <ZLine label="Cost of goods" value={`− ${formatMoney(summary.cogs)}`} />
+            <ZLine label="Gross profit" value={`${formatMoney(summary.grossProfit)} (${margin}%)`} bold />
+            <ZLine label="Expenses" value={`− ${formatMoney(summary.expenses)}`} />
+            <ZLine label="Salary paid" value={`− ${formatMoney(summary.salaryPaid)}`} />
+            <ZLine label="Net profit" value={formatMoney(summary.netProfit)} bold negative={summary.netProfit < 0} />
+          </div>
+        </div>
+
+        {topProds && topProds.length > 0 && (
+          <>
+            <div className="border-t border-line" />
+            <div>
+              <p className="text-xs font-semibold uppercase text-muted mb-2">Top 5 Products</p>
+              <div className="space-y-1">
+                {topProds.map((p, i) => (
+                  <ZLine
+                    key={p.productId}
+                    label={`${i + 1}. ${p.name} (${p.qty}×)`}
+                    value={formatMoney(p.revenue)}
+                    small
+                  />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {periodShifts.length > 0 && (
+          <>
+            <div className="border-t border-line" />
+            <div>
+              <p className="text-xs font-semibold uppercase text-muted mb-2">Shifts</p>
+              <div className="space-y-2">
+                {periodShifts.map((s) => {
+                  const disc = s.discrepancy ?? 0;
+                  return (
+                    <div key={s.id} className="text-sm">
+                      <div className="flex justify-between">
+                        <span className="font-medium">{s.cashier.name}</span>
+                        <span className={disc < 0 ? "text-danger font-semibold tabular-nums" : "tabular-nums"}>
+                          {disc === 0 ? "Balanced" : `${disc > 0 ? "+" : ""}${formatMoney(disc)}`}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted">
+                        Expected {formatMoney(s.expectedCash ?? 0)} · Counted {formatMoney(s.countedCash ?? 0)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Footer */}
+        <div className="border-t border-line pt-3 text-center text-xs text-muted">
+          <p>GhPOS — End of report</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ZLine({
+  label,
+  value,
+  bold,
+  small,
+  negative,
+}: {
+  label: string;
+  value: string;
+  bold?: boolean;
+  small?: boolean;
+  negative?: boolean;
+}) {
+  return (
+    <div className={`flex justify-between gap-4 ${small ? "text-xs" : "text-sm"} ${bold ? "font-bold" : ""}`}>
+      <span className={bold ? "" : "text-muted"}>{label}</span>
+      <span className={`tabular-nums font-mono ${negative ? "text-danger" : ""}`}>{value}</span>
     </div>
   );
 }
