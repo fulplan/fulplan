@@ -497,6 +497,15 @@ export function ProductsPage() {
   const [adjusting, setAdjusting] = useState<{
     id: string; name: string; saleUnit: string; stock: number
   } | null>(null);
+  const [catalogMsg, setCatalogMsg] = useState('');
+
+  const importCatalog = trpc.products.importStarterCatalog.useMutation({
+    onSuccess: (data) => {
+      products.refetch();
+      setCatalogMsg(`Added ${data.created} products (${data.skipped} already existed).`);
+      setTimeout(() => setCatalogMsg(''), 5000);
+    },
+  });
 
   const filtered = (products.data ?? []).filter((p) => {
     const q = search.toLowerCase();
@@ -519,12 +528,22 @@ export function ProductsPage() {
           className="flex-1 border border-line bg-field px-3 py-2 text-sm"
         />
         {canManage && (
-          <button
-            onClick={() => setShowAdd(true)}
-            className="bg-brand px-4 py-2 text-sm font-semibold text-paper hover:opacity-90 whitespace-nowrap"
-          >
-            + Add product
-          </button>
+          <>
+            <button
+              onClick={() => importCatalog.mutate({ branchId: defaultBranchId || undefined })}
+              disabled={importCatalog.isPending}
+              className="border border-line px-3 py-2 text-xs font-medium text-muted hover:bg-field disabled:opacity-50 whitespace-nowrap"
+              title="Import 29 common provision store products"
+            >
+              {importCatalog.isPending ? 'Importing…' : 'Starter catalog'}
+            </button>
+            <button
+              onClick={() => setShowAdd(true)}
+              className="bg-brand px-4 py-2 text-sm font-semibold text-paper hover:opacity-90 whitespace-nowrap"
+            >
+              + Add product
+            </button>
+          </>
         )}
       </div>
 
@@ -548,8 +567,27 @@ export function ProductsPage() {
           <div className="p-6 text-center text-sm text-muted">
             {search
               ? 'No products match that search.'
-              : 'No products yet. Add your first product to get started.'}
+              : (
+                <div className="space-y-4">
+                  <p>No products yet.</p>
+                  {canManage && (
+                    <div>
+                      <p className="mb-3 text-xs">Import a starter catalog of 29 common Ghana provision store products to get started quickly.</p>
+                      <button
+                        onClick={() => importCatalog.mutate({ branchId: defaultBranchId || undefined })}
+                        disabled={importCatalog.isPending}
+                        className="border-2 border-ink px-5 py-2.5 text-sm font-semibold hover:bg-field disabled:opacity-50"
+                      >
+                        {importCatalog.isPending ? 'Importing…' : 'Import starter catalog'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
           </div>
+        )}
+        {catalogMsg && (
+          <div className="px-4 py-2 text-sm text-brand border-b border-brand">{catalogMsg}</div>
         )}
 
         {filtered.length > 0 && (

@@ -199,4 +199,99 @@ export const productsRouter = router({
 
       return { ok: true };
     }),
+
+  /**
+   * Bulk-import a starter catalog of common Ghanaian provision store products.
+   * Skips any product whose name already exists in the tenant's catalog.
+   * Returns how many were created vs skipped.
+   */
+  importStarterCatalog: managerProcedure
+    .input(z.object({ branchId: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const orgId = ctx.auth.organizationId;
+
+      const existing = await ctx.db.product.findMany({
+        where: { organizationId: orgId },
+        select: { name: true },
+      });
+      const existingNames = new Set(existing.map((p) => p.name.toLowerCase()));
+
+      // Common provision store items in Ghana — prices in pesewas (~70-80% margin)
+      const catalog: Array<{ name: string; costPrice: number; sellingPrice: number; lowStockThreshold: number }> = [
+        // Dry goods
+        { name: "Rice (5kg bag)", costPrice: 7500, sellingPrice: 9000, lowStockThreshold: 10 },
+        { name: "Rice (1kg)", costPrice: 1500, sellingPrice: 1800, lowStockThreshold: 20 },
+        { name: "Sugar (1kg)", costPrice: 600, sellingPrice: 800, lowStockThreshold: 20 },
+        { name: "Sugar (500g)", costPrice: 300, sellingPrice: 420, lowStockThreshold: 15 },
+        { name: "Flour (2kg)", costPrice: 1200, sellingPrice: 1500, lowStockThreshold: 10 },
+        { name: "Salt (1kg)", costPrice: 200, sellingPrice: 280, lowStockThreshold: 10 },
+        { name: "Salt (500g)", costPrice: 100, sellingPrice: 150, lowStockThreshold: 10 },
+        // Oils
+        { name: "Cooking Oil (1L)", costPrice: 1600, sellingPrice: 2000, lowStockThreshold: 10 },
+        { name: "Cooking Oil (500ml)", costPrice: 800, sellingPrice: 1100, lowStockThreshold: 10 },
+        { name: "Palm Oil (1L)", costPrice: 1400, sellingPrice: 1700, lowStockThreshold: 5 },
+        // Tomatoes & canned goods
+        { name: "Tomato Paste (70g)", costPrice: 100, sellingPrice: 130, lowStockThreshold: 30 },
+        { name: "Tomato Paste (400g)", costPrice: 380, sellingPrice: 500, lowStockThreshold: 20 },
+        { name: "Sardines (tin)", costPrice: 350, sellingPrice: 450, lowStockThreshold: 15 },
+        { name: "Corned Beef (200g)", costPrice: 650, sellingPrice: 850, lowStockThreshold: 10 },
+        // Milk & beverages
+        { name: "Peak Milk (170g)", costPrice: 400, sellingPrice: 520, lowStockThreshold: 20 },
+        { name: "Milo (200g)", costPrice: 900, sellingPrice: 1200, lowStockThreshold: 10 },
+        { name: "Nescafé (sachet)", costPrice: 60, sellingPrice: 80, lowStockThreshold: 30 },
+        { name: "Tea Bags (25 pack)", costPrice: 280, sellingPrice: 380, lowStockThreshold: 10 },
+        // Beverages
+        { name: "Water (sachet pack)", costPrice: 150, sellingPrice: 200, lowStockThreshold: 20 },
+        { name: "Soft Drink (500ml)", costPrice: 300, sellingPrice: 400, lowStockThreshold: 20 },
+        // Soap & household
+        { name: "Soap (bar)", costPrice: 150, sellingPrice: 200, lowStockThreshold: 20 },
+        { name: "Washing Powder (1kg)", costPrice: 700, sellingPrice: 950, lowStockThreshold: 10 },
+        { name: "Bleach (500ml)", costPrice: 250, sellingPrice: 340, lowStockThreshold: 10 },
+        { name: "Toilet Roll (4 pack)", costPrice: 450, sellingPrice: 600, lowStockThreshold: 10 },
+        // Snacks & bread
+        { name: "Bread (loaf)", costPrice: 500, sellingPrice: 650, lowStockThreshold: 10 },
+        { name: "Biscuits (pack)", costPrice: 150, sellingPrice: 200, lowStockThreshold: 20 },
+        { name: "Instant Noodles", costPrice: 180, sellingPrice: 250, lowStockThreshold: 20 },
+        // Seasoning
+        { name: "Maggi Cube (10 pack)", costPrice: 150, sellingPrice: 200, lowStockThreshold: 20 },
+        { name: "Pepper (100g)", costPrice: 200, sellingPrice: 280, lowStockThreshold: 10 },
+      ];
+
+      let created = 0;
+      let skipped = 0;
+
+      for (const item of catalog) {
+        if (existingNames.has(item.name.toLowerCase())) {
+          skipped++;
+          continue;
+        }
+
+        const product = await ctx.db.product.create({
+          data: {
+            organizationId: orgId,
+            name: item.name,
+            costPrice: item.costPrice,
+            sellingPrice: item.sellingPrice,
+            lowStockThreshold: item.lowStockThreshold,
+          },
+          select: { id: true },
+        });
+
+        // Set initial stock level to 0 for the specified branch
+        if (input.branchId) {
+          await ctx.db.stockLevel.create({
+            data: {
+              organizationId: orgId,
+              productId: product.id,
+              branchId: input.branchId,
+              quantity: 0,
+            },
+          });
+        }
+
+        created++;
+      }
+
+      return { created, skipped, total: catalog.length };
+    }),
 });
