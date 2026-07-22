@@ -207,6 +207,64 @@ export const reportsRouter = router({
     }),
 
   /**
+   * Daily revenue breakdown for a period — used for the trend chart on the
+   * Reports summary tab. Returns one entry per calendar day (UTC) in order.
+   */
+  dailyTrend: managerProcedure
+    .input(
+      z.object({
+        from: z.string().datetime(),
+        to: z.string().datetime(),
+        branchId: z.string().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const orgId = ctx.auth.organizationId;
+      const from = new Date(input.from);
+      const to = new Date(input.to);
+
+      const sales = await ctx.prisma.sale.findMany({
+        where: {
+          organizationId: orgId,
+          ...(input.branchId ? { branchId: input.branchId } : {}),
+          status: "COMPLETED",
+          createdAt: { gte: from, lte: to },
+        },
+        select: { total: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
+      });
+
+      // Group by YYYY-MM-DD in UTC
+      const map = new Map<string, { revenue: number; count: number }>();
+      for (const sale of sales) {
+        const dateKey = sale.createdAt.toISOString().slice(0, 10);
+        const existing = map.get(dateKey);
+        if (existing) {
+          existing.revenue += sale.total;
+          existing.count += 1;
+        } else {
+          map.set(dateKey, { revenue: sale.total, count: 1 });
+        }
+      }
+
+      // Fill in missing days with zero so chart bars stay evenly spaced
+      const days: Array<{ date: string; revenue: number; count: number }> = [];
+      const cursor = new Date(from);
+      cursor.setUTCHours(0, 0, 0, 0);
+      const end = new Date(to);
+      end.setUTCHours(0, 0, 0, 0);
+
+      while (cursor <= end) {
+        const key = cursor.toISOString().slice(0, 10);
+        const d = map.get(key) ?? { revenue: 0, count: 0 };
+        days.push({ date: key, ...d });
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+
+      return days;
+    }),
+
+  /**
    * Top-selling products by revenue in a period.
    */
   topProducts: managerProcedure

@@ -103,15 +103,139 @@ export function ReportsPage() {
   );
 }
 
+// ── Daily revenue bar chart ───────────────────────────────────────────────────
+
+type DayPoint = { date: string; revenue: number; count: number };
+
+function DailyTrendChart({ days }: { days: DayPoint[] }) {
+  if (days.length === 0) return null;
+
+  const maxRev = Math.max(...days.map((d) => d.revenue), 1);
+  const W = 560;
+  const H = 120;
+  const PAD_LEFT = 0;
+  const PAD_BOTTOM = 20;
+  const BAR_AREA_H = H - PAD_BOTTOM;
+  const n = days.length;
+  const barW = Math.max(4, Math.floor((W - PAD_LEFT) / n) - 2);
+  const gap = Math.floor((W - PAD_LEFT - barW * n) / Math.max(n - 1, 1));
+
+  const shortDate = (iso: string) => {
+    const parts = iso.split("-");
+    return `${parseInt(parts[1] ?? "1")}/${parseInt(parts[2] ?? "1")}`;
+  };
+
+  // Show label every N bars so they don't overlap
+  const labelEvery = n <= 7 ? 1 : n <= 14 ? 2 : 5;
+
+  return (
+    <div className="mt-3">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full"
+        aria-label="Daily revenue chart"
+        style={{ maxHeight: 120 }}
+      >
+        {days.map((d, i) => {
+          const barH = Math.max(2, (d.revenue / maxRev) * BAR_AREA_H);
+          const x = PAD_LEFT + i * (barW + gap);
+          const y = BAR_AREA_H - barH;
+          const showLabel = i % labelEvery === 0 || i === n - 1;
+          return (
+            <g key={d.date}>
+              <rect
+                x={x}
+                y={y}
+                width={barW}
+                height={barH}
+                fill={d.revenue > 0 ? "var(--color-brand, #1a6b35)" : "var(--color-line, #e5e5e5)"}
+              />
+              {showLabel && (
+                <text
+                  x={x + barW / 2}
+                  y={H - 4}
+                  textAnchor="middle"
+                  fontSize={9}
+                  fill="var(--color-muted, #888)"
+                >
+                  {shortDate(d.date)}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+// ── Payment breakdown bar ─────────────────────────────────────────────────────
+
+function PaymentBar({ byMethod, revenue }: { byMethod: { CASH: number; MOMO: number; CREDIT: number }; revenue: number }) {
+  if (revenue === 0) return null;
+  const cashPct = (byMethod.CASH / revenue) * 100;
+  const momoPct = (byMethod.MOMO / revenue) * 100;
+  const creditPct = (byMethod.CREDIT / revenue) * 100;
+
+  return (
+    <div className="mt-3">
+      <div className="flex h-6 w-full overflow-hidden">
+        {cashPct > 0 && (
+          <div className="bg-brand flex items-center justify-center" style={{ width: `${cashPct}%` }}>
+            {cashPct > 8 && <span className="text-paper text-xs font-medium truncate px-1">Cash</span>}
+          </div>
+        )}
+        {momoPct > 0 && (
+          <div className="bg-ink flex items-center justify-center" style={{ width: `${momoPct}%` }}>
+            {momoPct > 8 && <span className="text-paper text-xs font-medium truncate px-1">MoMo</span>}
+          </div>
+        )}
+        {creditPct > 0 && (
+          <div className="bg-warn flex items-center justify-center" style={{ width: `${creditPct}%` }}>
+            {creditPct > 8 && <span className="text-paper text-xs font-medium truncate px-1">Credit</span>}
+          </div>
+        )}
+      </div>
+      <div className="flex gap-4 mt-1.5">
+        {cashPct > 0 && (
+          <div className="flex items-center gap-1">
+            <span className="w-2 h-2 bg-brand inline-block" />
+            <span className="text-xs text-muted">{cashPct.toFixed(0)}% Cash</span>
+          </div>
+        )}
+        {momoPct > 0 && (
+          <div className="flex items-center gap-1">
+            <span className="w-2 h-2 bg-ink inline-block" />
+            <span className="text-xs text-muted">{momoPct.toFixed(0)}% MoMo</span>
+          </div>
+        )}
+        {creditPct > 0 && (
+          <div className="flex items-center gap-1">
+            <span className="w-2 h-2 bg-warn inline-block" />
+            <span className="text-xs text-muted">{creditPct.toFixed(0)}% Credit</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── P&L Summary tab ───────────────────────────────────────────────────────────
 
 function SummaryTab({ range }: { range: { from: string; to: string } }) {
   const { data, isLoading } = trpc.reports.summary.useQuery(range);
+  const spanDays = Math.round(
+    (new Date(range.to).getTime() - new Date(range.from).getTime()) / (1000 * 60 * 60 * 24),
+  );
+  const { data: trend } = trpc.reports.dailyTrend.useQuery(range, {
+    enabled: spanDays > 1,
+  });
 
   if (isLoading) return <div className="text-sm text-muted">Loading…</div>;
   if (!data) return null;
 
   const margin = data.revenue > 0 ? ((data.grossProfit / data.revenue) * 100).toFixed(1) : "0.0";
+  const netMargin = data.revenue > 0 ? ((data.netProfit / data.revenue) * 100).toFixed(1) : "0.0";
 
   return (
     <div className="space-y-4">
@@ -124,6 +248,8 @@ function SummaryTab({ range }: { range: { from: string; to: string } }) {
           <MetricRow label="  MoMo" value={formatMoney(data.byMethod.MOMO)} small />
           <MetricRow label="  Credit" value={formatMoney(data.byMethod.CREDIT)} small />
         </div>
+        <PaymentBar byMethod={data.byMethod} revenue={data.revenue} />
+        {trend && trend.length > 1 && <DailyTrendChart days={trend} />}
       </Section>
 
       {/* Gross profit */}
@@ -148,7 +274,7 @@ function SummaryTab({ range }: { range: { from: string; to: string } }) {
         <div className="border-t border-line mt-2 pt-2">
           <MetricRow
             label="Net profit"
-            value={formatMoney(data.netProfit)}
+            value={`${formatMoney(data.netProfit)} (${netMargin}%)`}
             bold
             negative={data.netProfit < 0}
           />
