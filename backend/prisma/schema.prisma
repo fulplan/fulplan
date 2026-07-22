@@ -183,6 +183,7 @@ enum PaymentMethod {
   CASH
   MOMO
   CREDIT // book sale on customer's tab
+  SPLIT  // part cash + part MoMo — amounts in Sale.cashAmount / Sale.momoAmount
 }
 
 enum CreditEntryType {
@@ -359,6 +360,9 @@ model Sale {
   total          Int
   amountTendered Int
   change         Int @default(0)
+  // For SPLIT sales — cash and MoMo portions. Both are 0 for single-method sales.
+  cashAmount     Int @default(0)
+  momoAmount     Int @default(0)
 
   note String?
 

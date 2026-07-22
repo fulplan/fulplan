@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { publicProcedure, router, tenantProcedure } from "../trpc";
+import { managerProcedure, publicProcedure, router, tenantProcedure } from "../trpc";
 
 export const salesRouter = router({
   /**
@@ -17,11 +17,15 @@ export const salesRouter = router({
     .input(
       z.object({
         branchId: z.string(),
-        paymentMethod: z.enum(["CASH", "MOMO", "CREDIT"]),
+        paymentMethod: z.enum(["CASH", "MOMO", "CREDIT", "SPLIT"]),
         // For CASH/MOMO — must be >= total. For CREDIT — omit or pass 0.
+        // For SPLIT — amountTendered = total (no change), cashAmount + momoAmount = total.
         amountTendered: z.number().int().nonnegative().default(0),
         // Required when paymentMethod === "CREDIT"
         customerId: z.string().optional(),
+        // Required when paymentMethod === "SPLIT"
+        cashAmount: z.number().int().nonnegative().optional(),
+        momoAmount: z.number().int().nonnegative().optional(),
         items: z
           .array(
             z.object({
@@ -42,6 +46,18 @@ export const salesRouter = router({
           code: "BAD_REQUEST",
           message: "A customer must be selected for credit sales",
         });
+      }
+
+      // Validate split payment amounts
+      if (input.paymentMethod === "SPLIT") {
+        const cash = input.cashAmount ?? 0;
+        const momo = input.momoAmount ?? 0;
+        if (cash <= 0 || momo <= 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Split payment requires both a cash amount and a MoMo amount",
+          });
+        }
       }
 
       // Validate customer belongs to this org
@@ -91,17 +107,37 @@ export const salesRouter = router({
       const subtotal = lineItems.reduce((sum, i) => sum + i.lineTotal, 0);
       const total = subtotal; // no discounts at MVP
 
-      if (input.paymentMethod !== "CREDIT" && input.amountTendered < total) {
+      const effectiveTendered =
+        input.paymentMethod === "SPLIT"
+          ? (input.cashAmount ?? 0) + (input.momoAmount ?? 0)
+          : input.amountTendered;
+
+      if (input.paymentMethod !== "CREDIT" && effectiveTendered < total) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Amount tendered is less than the total",
         });
       }
 
+      // Cash change only applies to pure-cash sales (no change on split or MoMo)
       const change =
         input.paymentMethod === "CASH"
           ? Math.max(0, input.amountTendered - total)
           : 0;
+
+      // Derived cash/momo amounts used for shift reconciliation
+      const cashAmount =
+        input.paymentMethod === "CASH"
+          ? total
+          : input.paymentMethod === "SPLIT"
+            ? (input.cashAmount ?? 0)
+            : 0;
+      const momoAmount =
+        input.paymentMethod === "MOMO"
+          ? total
+          : input.paymentMethod === "SPLIT"
+            ? (input.momoAmount ?? 0)
+            : 0;
 
       // ── 2. Atomic transaction ───────────────────────────────────────────────
       const sale = await ctx.prisma.$transaction(async (tx) => {
@@ -115,8 +151,10 @@ export const salesRouter = router({
             customerId: input.customerId,
             subtotal,
             total,
-            amountTendered: input.paymentMethod === "CREDIT" ? 0 : input.amountTendered,
+            amountTendered: input.paymentMethod === "CREDIT" ? 0 : effectiveTendered,
             change,
+            cashAmount,
+            momoAmount,
             note: input.note,
             items: {
               create: lineItems.map((li) => ({
@@ -226,6 +264,107 @@ export const salesRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Receipt not found" });
       }
       return sale;
+    }),
+
+  /**
+   * Void a completed sale. Requires manager or owner.
+   * Appends RETURN stock movements to restore inventory.
+   */
+  void: managerProcedure
+    .input(
+      z.object({
+        saleId: z.string(),
+        reason: z.string().trim().min(1).max(200),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const orgId = ctx.auth.organizationId;
+
+      const sale = await ctx.prisma.sale.findFirst({
+        where: { id: input.saleId, organizationId: orgId },
+        select: {
+          id: true,
+          status: true,
+          branchId: true,
+          paymentMethod: true,
+          total: true,
+          customerId: true,
+          items: {
+            select: { productId: true, quantity: true, costPrice: true },
+          },
+        },
+      });
+
+      if (!sale) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Sale not found" });
+      }
+      if (sale.status === "VOIDED") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Sale has already been voided",
+        });
+      }
+
+      await ctx.prisma.$transaction(async (tx) => {
+        await tx.sale.update({
+          where: { id: sale.id },
+          data: {
+            status: "VOIDED",
+            voidedAt: new Date(),
+            voidedById: ctx.auth.userId,
+            voidReason: input.reason,
+          },
+        });
+
+        // Restore stock — RETURN movement for each line item
+        for (const item of sale.items) {
+          await tx.stockMovement.create({
+            data: {
+              organizationId: orgId,
+              productId: item.productId,
+              branchId: sale.branchId,
+              type: "RETURN",
+              quantity: item.quantity,
+              saleId: sale.id,
+              note: `Void: ${input.reason}`,
+              createdById: ctx.auth.userId,
+            },
+          });
+
+          await tx.stockLevel.upsert({
+            where: {
+              productId_branchId: {
+                productId: item.productId,
+                branchId: sale.branchId,
+              },
+            },
+            create: {
+              organizationId: orgId,
+              productId: item.productId,
+              branchId: sale.branchId,
+              quantity: item.quantity,
+            },
+            update: { quantity: { increment: item.quantity } },
+          });
+        }
+
+        // Reverse the credit ledger entry if it was a credit sale
+        if (sale.paymentMethod === "CREDIT" && sale.customerId) {
+          await tx.creditEntry.create({
+            data: {
+              organizationId: orgId,
+              customerId: sale.customerId,
+              type: "PAYMENT",
+              amount: sale.total,
+              saleId: sale.id,
+              note: `Void reversal: ${input.reason}`,
+              createdById: ctx.auth.userId,
+            },
+          });
+        }
+      });
+
+      return { ok: true };
     }),
 
   /** Recent sales for a branch — cashiers see their own, managers see all. */

@@ -27,14 +27,13 @@ export const shiftsRouter = router({
         where: {
           organizationId: orgId,
           branchId: input.branchId,
-          paymentMethod: "CASH",
           status: "COMPLETED",
           createdAt: { gte: shift.openedAt },
         },
-        _sum: { total: true },
+        _sum: { cashAmount: true },
       });
 
-      const cashSalesTotal = salesAgg._sum.total ?? 0;
+      const cashSalesTotal = salesAgg._sum.cashAmount ?? 0;
       const cashEntriesNet = shift.cashEntries.reduce(
         (sum, e) => sum + (e.type === "IN" ? e.amount : -e.amount),
         0,
@@ -164,14 +163,13 @@ export const shiftsRouter = router({
         where: {
           organizationId: orgId,
           branchId: shift.branchId,
-          paymentMethod: "CASH",
           status: "COMPLETED",
           createdAt: { gte: shift.openedAt },
         },
-        _sum: { total: true },
+        _sum: { cashAmount: true },
       });
 
-      const cashSalesTotal = salesAgg._sum.total ?? 0;
+      const cashSalesTotal = salesAgg._sum.cashAmount ?? 0;
       const cashEntriesNet = shift.cashEntries.reduce(
         (sum, e) => sum + (e.type === "IN" ? e.amount : -e.amount),
         0,

@@ -23,7 +23,7 @@ interface SaleResult {
   id: string;
   total: number;
   change: number;
-  paymentMethod: 'CASH' | 'MOMO' | 'CREDIT';
+  paymentMethod: 'CASH' | 'MOMO' | 'CREDIT' | 'SPLIT';
   createdAt: Date;
   customerName?: string;
 }
@@ -76,12 +76,14 @@ function CartPanel({
   onSetQty,
   onRemove,
   onCharge,
+  onPark,
 }: {
   items: CartItem[];
   total: number;
   onSetQty: (id: string, qty: number) => void;
   onRemove: (id: string) => void;
   onCharge: () => void;
+  onPark?: () => void;
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -149,6 +151,14 @@ function CartPanel({
             {formatGhs(total)}
           </span>
         </div>
+        {onPark && items.length > 0 && (
+          <button
+            onClick={onPark}
+            className="w-full border border-line py-2.5 text-sm font-medium text-muted hover:bg-field mb-2"
+          >
+            Park cart
+          </button>
+        )}
         <button
           onClick={onCharge}
           disabled={items.length === 0}
@@ -256,8 +266,9 @@ function PaymentModal({
   onComplete: (sale: SaleResult) => void;
   onClose: () => void;
 }) {
-  const [method, setMethod] = useState<'CASH' | 'MOMO' | 'CREDIT'>('CASH');
+  const [method, setMethod] = useState<'CASH' | 'MOMO' | 'CREDIT' | 'SPLIT'>('CASH');
   const [tenderedStr, setTenderedStr] = useState('');
+  const [splitCashStr, setSplitCashStr] = useState('');
   const [error, setError] = useState('');
   const [customer, setCustomer] = useState<{
     id: string; name: string; balance: number; creditLimit: number | null;
@@ -272,7 +283,7 @@ function PaymentModal({
     onSuccess(data) {
       onComplete({
         ...data,
-        paymentMethod: data.paymentMethod as 'CASH' | 'MOMO' | 'CREDIT',
+        paymentMethod: data.paymentMethod as 'CASH' | 'MOMO' | 'CREDIT' | 'SPLIT',
         createdAt: new Date(data.createdAt),
         customerName: customer?.name,
       });
@@ -285,19 +296,28 @@ function PaymentModal({
   const tenderedPesewas = Math.round(parseFloat(tenderedStr || '0') * 100);
   const change = method === 'CASH' ? Math.max(0, tenderedPesewas - total) : 0;
 
-  // Credit limit warning: warn if this sale would push balance over limit
+  // Split: cash portion the customer pays in cash; remainder is MoMo
+  const splitCash = Math.round(parseFloat(splitCashStr || '0') * 100);
+  const splitMomo = Math.max(0, total - splitCash);
+
+  // Credit limit warning
   const newBalance = customer ? customer.balance + total : 0;
   const overLimit = customer?.creditLimit != null && newBalance > customer.creditLimit;
 
   const canConfirm =
-    method === 'MOMO' ||
-    method === 'CREDIT' ||
-    (tenderedPesewas >= total && tenderedPesewas > 0);
+    (method === 'MOMO') ||
+    (method === 'CREDIT') ||
+    (method === 'CASH' && tenderedPesewas >= total && tenderedPesewas > 0) ||
+    (method === 'SPLIT' && splitCash > 0 && splitCash < total);
 
   function confirm() {
     if (!canConfirm) return;
     if (method === 'CREDIT' && !customer) {
       setError('Select a customer for a credit sale');
+      return;
+    }
+    if (method === 'SPLIT' && (splitCash <= 0 || splitCash >= total)) {
+      setError('Enter a cash amount between GH₵ 0 and the total');
       return;
     }
     setError('');
@@ -306,6 +326,8 @@ function PaymentModal({
       paymentMethod: method,
       amountTendered: method === 'CASH' ? tenderedPesewas : 0,
       customerId: method === 'CREDIT' ? customer!.id : undefined,
+      cashAmount: method === 'SPLIT' ? splitCash : undefined,
+      momoAmount: method === 'SPLIT' ? splitMomo : undefined,
       items: cartItems.map((i) => ({
         productId: i.productId,
         quantity: i.quantity,
@@ -328,17 +350,17 @@ function PaymentModal({
 
         <div className="px-5 py-4">
           {/* Payment method toggle */}
-          <div className="mb-5 grid grid-cols-3 border-2 border-ink">
-            {(['CASH', 'MOMO', 'CREDIT'] as const).map((m) => (
+          <div className="mb-5 grid grid-cols-4 border-2 border-ink">
+            {(['CASH', 'MOMO', 'SPLIT', 'CREDIT'] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => { setMethod(m); setError(''); }}
                 className={[
-                  'py-3 text-sm font-semibold transition-colors',
+                  'py-3 text-xs font-semibold transition-colors',
                   method === m ? 'bg-ink text-paper' : 'bg-paper text-ink hover:bg-field',
                 ].join(' ')}
               >
-                {m === 'CASH' ? 'Cash' : m === 'MOMO' ? 'MoMo' : 'Credit'}
+                {m === 'CASH' ? 'Cash' : m === 'MOMO' ? 'MoMo' : m === 'SPLIT' ? 'Split' : 'Credit'}
               </button>
             ))}
           </div>
@@ -381,12 +403,47 @@ function PaymentModal({
             </div>
           )}
 
+          {/* Split: cash portion entry */}
+          {method === 'SPLIT' && (
+            <div className="mb-4 space-y-3">
+              <p className="text-xs text-muted">Enter how much the customer pays in cash. The rest will be MoMo.</p>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Cash amount (GH₵)</label>
+                <input
+                  ref={inputRef}
+                  type="number"
+                  inputMode="decimal"
+                  min={0.01}
+                  step="0.01"
+                  max={((total - 1) / 100).toFixed(2)}
+                  placeholder="0.00"
+                  value={splitCashStr}
+                  onChange={(e) => { setSplitCashStr(e.target.value); setError(''); }}
+                  onKeyDown={(e) => e.key === 'Enter' && confirm()}
+                  className="w-full border-2 border-ink bg-field px-3 py-2 text-lg font-mono tabular-nums focus:outline-none"
+                />
+              </div>
+              {splitCash > 0 && splitCash < total && (
+                <div className="border border-line bg-field px-3 py-2 space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted">Cash</span>
+                    <span className="font-mono tabular-nums">{formatGhs(splitCash)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted">MoMo</span>
+                    <span className="font-mono tabular-nums">{formatGhs(splitMomo)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Credit: customer picker + limit warning */}
           {method === 'CREDIT' && (
             <div className="mb-4">
               <CustomerPicker value={customer} onChange={setCustomer} />
               {customer && overLimit && (
-                <div className="border border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <div className="border border-warn bg-field px-3 py-2 text-xs text-warn">
                   Warning: this sale would bring their balance to {formatGhs(newBalance)},
                   over their {formatGhs(customer.creditLimit!)} limit.
                 </div>
@@ -449,7 +506,12 @@ function ReceiptSummary({
             )}
             <Row
               label="Method"
-              value={sale.paymentMethod === 'CASH' ? 'Cash' : sale.paymentMethod === 'MOMO' ? 'MoMo' : 'Credit'}
+              value={
+                sale.paymentMethod === 'CASH' ? 'Cash'
+                : sale.paymentMethod === 'MOMO' ? 'MoMo'
+                : sale.paymentMethod === 'SPLIT' ? 'Cash + MoMo'
+                : 'Credit'
+              }
             />
             {sale.customerName && (
               <Row label="Customer" value={sale.customerName} />
@@ -581,6 +643,236 @@ function MobileCartOverlay({
   );
 }
 
+// ── Parked carts (localStorage) ───────────────────────────────────────────────
+
+const PARK_KEY = 'ghpos:parkedCarts';
+
+interface ParkedCart {
+  id: string;
+  name: string;
+  items: CartItem[];
+  parkedAt: number;
+}
+
+function loadParked(): ParkedCart[] {
+  try {
+    return JSON.parse(localStorage.getItem(PARK_KEY) ?? '[]');
+  } catch {
+    return [];
+  }
+}
+
+function saveParked(carts: ParkedCart[]) {
+  localStorage.setItem(PARK_KEY, JSON.stringify(carts));
+}
+
+function useParkedCarts() {
+  const [parked, setParked] = useState<ParkedCart[]>(loadParked);
+
+  function park(items: CartItem[]) {
+    if (items.length === 0) return;
+    const existing = loadParked();
+    const name = `Cart ${existing.length + 1}`;
+    const updated = [...existing, { id: crypto.randomUUID(), name, items, parkedAt: Date.now() }];
+    saveParked(updated);
+    setParked(updated);
+  }
+
+  function resume(id: string): CartItem[] {
+    const existing = loadParked();
+    const target = existing.find((c) => c.id === id);
+    const remaining = existing.filter((c) => c.id !== id);
+    saveParked(remaining);
+    setParked(remaining);
+    return target?.items ?? [];
+  }
+
+  function discard(id: string) {
+    const updated = loadParked().filter((c) => c.id !== id);
+    saveParked(updated);
+    setParked(updated);
+  }
+
+  return { parked, park, resume, discard };
+}
+
+// ── Parked carts drawer ────────────────────────────────────────────────────────
+
+function ParkedDrawer({
+  carts,
+  onResume,
+  onDiscard,
+  onClose,
+}: {
+  carts: ParkedCart[];
+  onResume: (id: string) => void;
+  onDiscard: (id: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-end justify-center bg-ink/50 p-4 md:items-center"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="w-full max-w-sm border-2 border-ink bg-paper">
+        <div className="flex items-center justify-between border-b-2 border-ink px-4 py-3">
+          <h2 className="text-sm font-semibold">Parked carts</h2>
+          <button onClick={onClose} className="text-sm text-muted hover:text-ink">Close</button>
+        </div>
+        {carts.length === 0 ? (
+          <p className="px-4 py-5 text-sm text-muted">No parked carts.</p>
+        ) : (
+          <div className="divide-y divide-line">
+            {carts.map((c) => (
+              <div key={c.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{c.name}</p>
+                  <p className="text-xs text-muted">
+                    {c.items.length} item{c.items.length !== 1 ? 's' : ''} ·{' '}
+                    {formatGhs(c.items.reduce((s, i) => s + i.sellingPrice * i.quantity, 0))}
+                  </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => onResume(c.id)}
+                    className="border-2 border-ink px-3 py-1.5 text-xs font-semibold hover:bg-field"
+                  >
+                    Resume
+                  </button>
+                  <button
+                    onClick={() => onDiscard(c.id)}
+                    className="px-3 py-1.5 text-xs text-muted hover:text-danger"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Void modal ────────────────────────────────────────────────────────────────
+
+function VoidModal({
+  sale,
+  onConfirm,
+  onClose,
+}: {
+  sale: { id: string; total: number; paymentMethod: string };
+  onConfirm: (reason: string) => void;
+  onClose: () => void;
+}) {
+  const [reason, setReason] = useState('');
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="w-full max-w-xs border-2 border-danger bg-paper p-5 space-y-3">
+        <p className="text-sm font-semibold text-danger">Void sale — {formatGhs(sale.total)}</p>
+        <p className="text-xs text-muted">
+          This will cancel the sale and restore stock. Enter a reason.
+        </p>
+        <input
+          className="w-full border border-line bg-field px-3 py-2 text-sm"
+          placeholder="Reason (required)"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          autoFocus
+        />
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={() => reason.trim() && onConfirm(reason.trim())}
+            disabled={!reason.trim()}
+            className="border-2 border-danger bg-danger px-4 py-2 text-sm font-semibold text-paper disabled:opacity-40"
+          >
+            Void sale
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm hover:bg-field"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Recent sales panel ─────────────────────────────────────────────────────────
+
+function RecentSalesPanel({ branchId, canVoid }: { branchId: string; canVoid: boolean }) {
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.sales.list.useQuery(
+    { branchId: branchId || undefined, limit: 30 },
+    { staleTime: 5000 },
+  );
+  const [voidTarget, setVoidTarget] = useState<{ id: string; total: number; paymentMethod: string } | null>(null);
+  const [voidErr, setVoidErr] = useState('');
+
+  const voidMut = trpc.sales.void.useMutation({
+    onSuccess: () => {
+      utils.sales.list.invalidate();
+      setVoidTarget(null);
+      setVoidErr('');
+    },
+    onError: (e) => setVoidErr(e.message),
+  });
+
+  if (isLoading) {
+    return <div className="p-4 text-sm text-muted">Loading…</div>;
+  }
+
+  if (!data || data.length === 0) {
+    return <div className="p-4 text-sm text-muted">No sales yet today.</div>;
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      {voidErr && (
+        <div className="px-4 py-2 text-sm text-danger border-b border-danger">{voidErr}</div>
+      )}
+      {data.map((s) => (
+        <div key={s.id} className="border-b border-line px-4 py-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold font-mono tabular-nums">{formatGhs(s.total)}</p>
+              <p className="text-xs text-muted mt-0.5">
+                {s.cashier.name} · {s.paymentMethod} ·{' '}
+                {new Date(s.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+              <p className="text-xs text-muted">
+                {s.items.map((i) => `${i.name}×${i.quantity}`).join(', ')}
+              </p>
+            </div>
+            {canVoid && (
+              <button
+                onClick={() => { setVoidTarget({ id: s.id, total: s.total, paymentMethod: s.paymentMethod }); setVoidErr(''); }}
+                className="shrink-0 text-xs border border-danger text-danger px-2 py-1 hover:bg-danger hover:text-paper"
+              >
+                Void
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+      {voidTarget && (
+        <VoidModal
+          sale={voidTarget}
+          onConfirm={(reason) => voidMut.mutate({ saleId: voidTarget.id, reason })}
+          onClose={() => { setVoidTarget(null); setVoidErr(''); }}
+        />
+      )}
+    </div>
+  );
+}
+
 // ── Main checkout page ────────────────────────────────────────────────────────
 
 export function CheckoutPage() {
@@ -591,7 +883,13 @@ export function CheckoutPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showPayment, setShowPayment] = useState(false);
   const [showMobileCart, setShowMobileCart] = useState(false);
+  const [showParked, setShowParked] = useState(false);
   const [lastSale, setLastSale] = useState<SaleResult | null>(null);
+  const [view, setView] = useState<'products' | 'recent'>('products');
+
+  const { parked, park, resume, discard } = useParkedCarts();
+
+  const canVoid = user?.role === 'OWNER' || user?.role === 'MANAGER';
 
   // Product search
   const [search, setSearch] = useState('');
@@ -725,6 +1023,18 @@ export function CheckoutPage() {
     searchRef.current?.focus();
   }
 
+  function handlePark() {
+    if (cart.length === 0) return;
+    park(cart);
+    setCart([]);
+  }
+
+  function handleResume(id: string) {
+    const items = resume(id);
+    setCart(items);
+    setShowParked(false);
+  }
+
   // ── Receipt screen ──────────────────────────────────────────────────────────
   if (lastSale) {
     return (
@@ -744,19 +1054,48 @@ export function CheckoutPage() {
       <div className="flex flex-1 min-h-0">
         {/* ── Left: product grid ── */}
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Search */}
-          <div className="border-b border-line px-3 py-2">
-            <input
-              ref={searchRef}
-              type="search"
-              placeholder="Search products or scan barcode…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-field border border-line px-3 py-2 text-sm focus:outline-none focus:border-ink"
-            />
+          {/* Tab bar + search */}
+          <div className="border-b border-line">
+            <div className="flex">
+              <button
+                onClick={() => setView('products')}
+                className={`px-4 py-2.5 text-sm font-medium border-b-2 ${view === 'products' ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink'}`}
+              >
+                Products
+              </button>
+              <button
+                onClick={() => setView('recent')}
+                className={`px-4 py-2.5 text-sm font-medium border-b-2 ${view === 'recent' ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink'}`}
+              >
+                Recent{canVoid ? ' / Void' : ''}
+              </button>
+              {parked.length > 0 && (
+                <button
+                  onClick={() => setShowParked(true)}
+                  className="ml-auto px-4 py-2.5 text-sm font-medium text-warn border-b-2 border-transparent"
+                >
+                  {parked.length} parked
+                </button>
+              )}
+            </div>
+            {view === 'products' && (
+              <div className="px-3 py-2">
+                <input
+                  ref={searchRef}
+                  type="search"
+                  placeholder="Search products or scan barcode…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full bg-field border border-line px-3 py-2 text-sm focus:outline-none focus:border-ink"
+                />
+              </div>
+            )}
           </div>
 
-          {/* Grid */}
+          {/* Grid or recent */}
+          {view === 'recent' ? (
+            <RecentSalesPanel branchId={branchId} canVoid={canVoid} />
+          ) : (
           <div className="flex-1 overflow-y-auto p-3">
             {productsQuery.isPending ? (
               <p className="text-sm text-muted">Loading products…</p>
@@ -777,6 +1116,7 @@ export function CheckoutPage() {
               </div>
             )}
           </div>
+          )}
 
           {/* Mobile cart bar */}
           <MobileCartBar
@@ -795,6 +1135,7 @@ export function CheckoutPage() {
             onSetQty={setQty}
             onRemove={removeFromCart}
             onCharge={() => setShowPayment(true)}
+            onPark={handlePark}
           />
         </div>
       </div>
@@ -819,6 +1160,16 @@ export function CheckoutPage() {
           cartItems={cart}
           onComplete={handleSaleComplete}
           onClose={() => setShowPayment(false)}
+        />
+      )}
+
+      {/* Parked carts drawer */}
+      {showParked && (
+        <ParkedDrawer
+          carts={parked}
+          onResume={handleResume}
+          onDiscard={discard}
+          onClose={() => setShowParked(false)}
         />
       )}
     </div>
