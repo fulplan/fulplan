@@ -403,7 +403,7 @@ export const salesRouter = router({
       return { ok: true };
     }),
 
-  /** Recent sales for a branch — cashiers see their own, managers see all. */
+  /** Recent sales — cursor-paginated, filterable by date/cashier/method/status. */
   list: tenantProcedure
     .input(
       z.object({
@@ -425,12 +425,79 @@ export const salesRouter = router({
           change: true,
           createdAt: true,
           cashier: { select: { name: true } },
-          items: {
-            select: { name: true, quantity: true, lineTotal: true },
-          },
+          items: { select: { name: true, quantity: true, lineTotal: true } },
         },
         orderBy: { createdAt: "desc" },
         take: input.limit,
       });
+    }),
+
+  /**
+   * Full sales history — cursor-based pagination, multi-filter.
+   * Used by the Sales History page for browsing and auditing all transactions.
+   */
+  history: managerProcedure
+    .input(
+      z.object({
+        branchId: z.string().optional(),
+        cashierId: z.string().optional(),
+        paymentMethod: z.enum(["CASH", "MOMO", "CREDIT", "SPLIT"]).optional(),
+        status: z.enum(["COMPLETED", "VOIDED"]).optional(),
+        from: z.string().datetime().optional(),
+        to: z.string().datetime().optional(),
+        cursor: z.string().optional(),
+        limit: z.number().int().positive().max(100).default(50),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const orgId = ctx.auth.organizationId;
+      const where = {
+        organizationId: orgId,
+        ...(input.branchId      ? { branchId: input.branchId }             : {}),
+        ...(input.cashierId     ? { cashierId: input.cashierId }           : {}),
+        ...(input.paymentMethod ? { paymentMethod: input.paymentMethod }   : {}),
+        ...(input.status        ? { status: input.status }                 : {}),
+        ...(input.from || input.to
+          ? {
+              createdAt: {
+                ...(input.from ? { gte: new Date(input.from) } : {}),
+                ...(input.to   ? { lte: new Date(input.to)   } : {}),
+              },
+            }
+          : {}),
+      };
+
+      const items = await ctx.prisma.sale.findMany({
+        where,
+        select: {
+          id: true,
+          status: true,
+          paymentMethod: true,
+          total: true,
+          cashAmount: true,
+          momoAmount: true,
+          discountTotal: true,
+          note: true,
+          voidReason: true,
+          createdAt: true,
+          cashier:  { select: { id: true, name: true } },
+          customer: { select: { name: true } },
+          branch:   { select: { name: true } },
+          items: {
+            select: { name: true, quantity: true, unitPrice: true, lineTotal: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: input.limit + 1,
+        cursor: input.cursor ? { id: input.cursor } : undefined,
+      });
+
+      const hasMore = items.length > input.limit;
+      const page    = hasMore ? items.slice(0, -1) : items;
+
+      return {
+        items: page,
+        nextCursor: hasMore ? page[page.length - 1]?.id : undefined,
+      };
     }),
 });

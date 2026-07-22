@@ -1,5 +1,11 @@
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { managerProcedure, router } from "../trpc";
+
+// BigInt → Number helper (safe; pesewas never exceed Number.MAX_SAFE_INTEGER)
+function n(v: bigint | null | undefined): number {
+  return Number(v ?? 0n);
+}
 
 export const reportsRouter = router({
   /**
@@ -82,10 +88,9 @@ export const reportsRouter = router({
       };
     }),
 
-
   /**
-   * Period summary: revenue, COGS, gross profit, expenses, salary paid, net profit.
-   * branchId is optional — omit for org-wide totals.
+   * Period P&L summary using DB-level aggregation — scales to any sales volume.
+   * All four component queries run in parallel.
    */
   summary: managerProcedure
     .input(
@@ -99,74 +104,85 @@ export const reportsRouter = router({
       const orgId = ctx.auth.organizationId;
       const from = new Date(input.from);
       const to = new Date(input.to);
-      const branchFilter = input.branchId ? { branchId: input.branchId } : {};
 
-      // Completed sales in period
-      const sales = await ctx.prisma.sale.findMany({
-        where: {
-          organizationId: orgId,
-          ...branchFilter,
-          status: "COMPLETED",
-          createdAt: { gte: from, lte: to },
-        },
-        select: {
-          total: true,
-          paymentMethod: true,
-          cashAmount: true,
-          momoAmount: true,
-          items: { select: { costPrice: true, quantity: true } },
-        },
-      });
+      const branchSql = input.branchId
+        ? Prisma.sql`AND "branchId" = ${input.branchId}`
+        : Prisma.empty;
 
-      let revenue = 0;
-      let cogs = 0;
-      const byMethod = { CASH: 0, MOMO: 0, CREDIT: 0 };
+      const branchJoinSql = input.branchId
+        ? Prisma.sql`AND s."branchId" = ${input.branchId}`
+        : Prisma.empty;
 
-      for (const sale of sales) {
-        revenue += sale.total;
-        // Use actual cashAmount/momoAmount so split sales are correctly attributed
-        byMethod.CASH += sale.cashAmount;
-        byMethod.MOMO += sale.momoAmount;
-        if (sale.paymentMethod === "CREDIT") byMethod.CREDIT += sale.total;
-        for (const item of sale.items) {
-          cogs += item.costPrice * item.quantity;
-        }
-      }
+      type SaleRow = {
+        sales_count: bigint;
+        revenue: bigint;
+        cash: bigint;
+        momo: bigint;
+        credit: bigint;
+      };
 
-      // Expenses in period
-      const expenseAgg = await ctx.prisma.expense.aggregate({
-        where: {
-          organizationId: orgId,
-          ...(input.branchId ? { branchId: input.branchId } : {}),
-          paidAt: { gte: from, lte: to },
-        },
-        _sum: { amount: true },
-      });
-      const expenses = expenseAgg._sum.amount ?? 0;
+      const [saleRows, cogsRows, expenseAgg, salaryAgg] = await Promise.all([
+        // Sales aggregate — single GROUP-free query, sub-millisecond with indexes
+        ctx.prisma.$queryRaw<SaleRow[]>`
+          SELECT
+            COUNT(*)::bigint                                                         AS sales_count,
+            COALESCE(SUM(total),         0)::bigint                                 AS revenue,
+            COALESCE(SUM("cashAmount"),  0)::bigint                                 AS cash,
+            COALESCE(SUM("momoAmount"),  0)::bigint                                 AS momo,
+            COALESCE(SUM(CASE WHEN "paymentMethod"::text = 'CREDIT' THEN total ELSE 0 END), 0)::bigint AS credit
+          FROM sales
+          WHERE "organizationId" = ${orgId}
+            AND status::text   = 'COMPLETED'
+            AND "createdAt"   >= ${from}
+            AND "createdAt"   <= ${to}
+            ${branchSql}
+        `,
 
-      // Salary payments in period
-      const salaryAgg = await ctx.prisma.salaryPayment.aggregate({
-        where: {
-          organizationId: orgId,
-          paidAt: { gte: from, lte: to },
-        },
-        _sum: { amount: true },
-      });
+        // COGS — DB-side SUM(costPrice * quantity), no row transfer to app
+        ctx.prisma.$queryRaw<Array<{ cogs: bigint }>>`
+          SELECT COALESCE(SUM(si."costPrice" * si.quantity), 0)::bigint AS cogs
+          FROM sale_items si
+          JOIN sales s ON s.id = si."saleId"
+          WHERE s."organizationId" = ${orgId}
+            AND s.status::text    = 'COMPLETED'
+            AND s."createdAt"    >= ${from}
+            AND s."createdAt"    <= ${to}
+            ${branchJoinSql}
+        `,
+
+        ctx.prisma.expense.aggregate({
+          where: {
+            organizationId: orgId,
+            ...(input.branchId ? { branchId: input.branchId } : {}),
+            paidAt: { gte: from, lte: to },
+          },
+          _sum: { amount: true },
+        }),
+
+        ctx.prisma.salaryPayment.aggregate({
+          where: { organizationId: orgId, paidAt: { gte: from, lte: to } },
+          _sum: { amount: true },
+        }),
+      ]);
+
+      const sr = saleRows[0];
+      const salesCount = n(sr?.sales_count);
+      const revenue    = n(sr?.revenue);
+      const cogs       = n(cogsRows[0]?.cogs);
+      const expenses   = expenseAgg._sum.amount ?? 0;
       const salaryPaid = salaryAgg._sum.amount ?? 0;
-
-      const grossProfit = revenue - cogs;
-      const netProfit = grossProfit - expenses - salaryPaid;
+      const byMethod   = { CASH: n(sr?.cash), MOMO: n(sr?.momo), CREDIT: n(sr?.credit) };
 
       return {
         period: { from: from.toISOString(), to: to.toISOString() },
-        salesCount: sales.length,
+        salesCount,
         revenue,
         cogs,
-        grossProfit,
+        grossProfit: revenue - cogs,
         byMethod,
         expenses,
         salaryPaid,
-        netProfit,
+        netProfit: revenue - cogs - expenses - salaryPaid,
       };
     }),
 
@@ -207,7 +223,7 @@ export const reportsRouter = router({
     }),
 
   /**
-   * Sales performance per cashier in a period.
+   * Sales performance per cashier — uses groupBy so no rows are transferred.
    */
   staffPerformance: managerProcedure
     .input(
@@ -222,39 +238,39 @@ export const reportsRouter = router({
       const from = new Date(input.from);
       const to = new Date(input.to);
 
-      const sales = await ctx.prisma.sale.findMany({
+      const grouped = await ctx.prisma.sale.groupBy({
+        by: ["cashierId"],
         where: {
           organizationId: orgId,
-          ...(input.branchId ? { branchId: input.branchId } : {}),
           status: "COMPLETED",
           createdAt: { gte: from, lte: to },
+          ...(input.branchId ? { branchId: input.branchId } : {}),
         },
-        select: {
-          total: true,
-          cashierId: true,
-          cashier: { select: { name: true } },
-        },
+        _sum: { total: true },
+        _count: { id: true },
+        orderBy: { _sum: { total: "desc" } },
       });
 
-      const map = new Map<string, { name: string; count: number; revenue: number }>();
-      for (const s of sales) {
-        const existing = map.get(s.cashierId);
-        if (existing) {
-          existing.count += 1;
-          existing.revenue += s.total;
-        } else {
-          map.set(s.cashierId, { name: s.cashier.name, count: 1, revenue: s.total });
-        }
-      }
+      if (grouped.length === 0) return [];
 
-      return Array.from(map.entries())
-        .map(([cashierId, v]) => ({ cashierId, ...v }))
-        .sort((a, b) => b.revenue - a.revenue);
+      // Fetch names in one query
+      const cashiers = await ctx.prisma.user.findMany({
+        where: { id: { in: grouped.map((g) => g.cashierId) } },
+        select: { id: true, name: true },
+      });
+      const names = new Map(cashiers.map((u) => [u.id, u.name]));
+
+      return grouped.map((g) => ({
+        cashierId: g.cashierId,
+        name: names.get(g.cashierId) ?? "Unknown",
+        count: g._count.id,
+        revenue: g._sum.total ?? 0,
+      }));
     }),
 
   /**
-   * Daily revenue breakdown for a period — used for the trend chart on the
-   * Reports summary tab. Returns one entry per calendar day (UTC) in order.
+   * Daily revenue breakdown — raw SQL GROUP BY date, fills zero-revenue days
+   * server-side so the chart always has a bar per calendar day.
    */
   dailyTrend: managerProcedure
     .input(
@@ -269,32 +285,31 @@ export const reportsRouter = router({
       const from = new Date(input.from);
       const to = new Date(input.to);
 
-      const sales = await ctx.prisma.sale.findMany({
-        where: {
-          organizationId: orgId,
-          ...(input.branchId ? { branchId: input.branchId } : {}),
-          status: "COMPLETED",
-          createdAt: { gte: from, lte: to },
-        },
-        select: { total: true, createdAt: true },
-        orderBy: { createdAt: "asc" },
-      });
+      const branchSql = input.branchId
+        ? Prisma.sql`AND "branchId" = ${input.branchId}`
+        : Prisma.empty;
 
-      // Group by YYYY-MM-DD in UTC
-      const map = new Map<string, { revenue: number; count: number }>();
-      for (const sale of sales) {
-        const dateKey = sale.createdAt.toISOString().slice(0, 10);
-        const existing = map.get(dateKey);
-        if (existing) {
-          existing.revenue += sale.total;
-          existing.count += 1;
-        } else {
-          map.set(dateKey, { revenue: sale.total, count: 1 });
-        }
-      }
+      const rows = await ctx.prisma.$queryRaw<
+        Array<{ date: string; revenue: bigint; count: bigint }>
+      >`
+        SELECT
+          "createdAt"::date::text                   AS date,
+          COALESCE(SUM(total), 0)::bigint           AS revenue,
+          COUNT(*)::bigint                          AS count
+        FROM sales
+        WHERE "organizationId" = ${orgId}
+          AND status::text   = 'COMPLETED'
+          AND "createdAt"   >= ${from}
+          AND "createdAt"   <= ${to}
+          ${branchSql}
+        GROUP BY "createdAt"::date
+        ORDER BY date
+      `;
 
-      // Fill in missing days with zero so chart bars stay evenly spaced
-      const days: Array<{ date: string; revenue: number; count: number }> = [];
+      // Map DB rows, then fill missing days with zeros for chart alignment
+      const dayMap = new Map(rows.map((r) => [r.date, { revenue: n(r.revenue), count: n(r.count) }]));
+
+      const result: Array<{ date: string; revenue: number; count: number }> = [];
       const cursor = new Date(from);
       cursor.setUTCHours(0, 0, 0, 0);
       const end = new Date(to);
@@ -302,16 +317,16 @@ export const reportsRouter = router({
 
       while (cursor <= end) {
         const key = cursor.toISOString().slice(0, 10);
-        const d = map.get(key) ?? { revenue: 0, count: 0 };
-        days.push({ date: key, ...d });
+        result.push({ date: key, ...(dayMap.get(key) ?? { revenue: 0, count: 0 }) });
         cursor.setUTCDate(cursor.getUTCDate() + 1);
       }
 
-      return days;
+      return result;
     }),
 
   /**
-   * Top-selling products by revenue in a period.
+   * Top-selling products by revenue — raw SQL aggregation for scale.
+   * Returns current product name and correct COGS (costPrice × quantity).
    */
   topProducts: managerProcedure
     .input(
@@ -327,45 +342,43 @@ export const reportsRouter = router({
       const from = new Date(input.from);
       const to = new Date(input.to);
 
-      const items = await ctx.prisma.saleItem.findMany({
-        where: {
-          sale: {
-            organizationId: orgId,
-            status: "COMPLETED",
-            createdAt: { gte: from, lte: to },
-            ...(input.branchId ? { branchId: input.branchId } : {}),
-          },
-        },
-        select: {
-          name: true,
-          productId: true,
-          quantity: true,
-          lineTotal: true,
-          costPrice: true,
-        },
-      });
+      const branchSql = input.branchId
+        ? Prisma.sql`AND s."branchId" = ${input.branchId}`
+        : Prisma.empty;
 
-      // Group by productId
-      const map = new Map<string, { name: string; qty: number; revenue: number; cogs: number }>();
-      for (const item of items) {
-        const existing = map.get(item.productId);
-        if (existing) {
-          existing.qty += item.quantity;
-          existing.revenue += item.lineTotal;
-          existing.cogs += item.costPrice * item.quantity;
-        } else {
-          map.set(item.productId, {
-            name: item.name,
-            qty: item.quantity,
-            revenue: item.lineTotal,
-            cogs: item.costPrice * item.quantity,
-          });
-        }
-      }
+      type ProdRow = {
+        product_id: string;
+        product_name: string;
+        qty: bigint;
+        revenue: bigint;
+        cogs: bigint;
+      };
 
-      return Array.from(map.entries())
-        .map(([productId, v]) => ({ productId, ...v }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, input.limit);
+      const rows = await ctx.prisma.$queryRaw<ProdRow[]>`
+        SELECT
+          si."productId"                              AS product_id,
+          MAX(si.name)                               AS product_name,
+          SUM(si.quantity)::bigint                   AS qty,
+          SUM(si."lineTotal")::bigint                AS revenue,
+          SUM(si."costPrice" * si.quantity)::bigint  AS cogs
+        FROM sale_items si
+        JOIN sales s ON s.id = si."saleId"
+        WHERE s."organizationId" = ${orgId}
+          AND s.status::text    = 'COMPLETED'
+          AND s."createdAt"    >= ${from}
+          AND s."createdAt"    <= ${to}
+          ${branchSql}
+        GROUP BY si."productId"
+        ORDER BY revenue DESC
+        LIMIT ${input.limit}
+      `;
+
+      return rows.map((r) => ({
+        productId: r.product_id,
+        name: r.product_name,
+        qty: n(r.qty),
+        revenue: n(r.revenue),
+        cogs: n(r.cogs),
+      }));
     }),
 });

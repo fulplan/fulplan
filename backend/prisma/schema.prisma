@@ -307,6 +307,7 @@ model StockMovement {
 
   @@index([organizationId])
   @@index([productId, branchId])
+  @@index([organizationId, productId, createdAt])  // product movement history
   @@map("stock_movements")
 }
 
@@ -379,6 +380,9 @@ model Sale {
 
   @@index([organizationId])
   @@index([organizationId, branchId, createdAt])
+  @@index([organizationId, status, createdAt])       // org-wide period reports without branch filter
+  @@index([organizationId, cashierId, createdAt])    // staff performance queries
+  @@index([organizationId, customerId])              // customer credit history
   @@map("sales")
 }
 
@@ -399,6 +403,7 @@ model SaleItem {
 
   @@index([saleId])
   @@index([productId])
+  @@index([saleId, productId])  // covering index for top-products groupBy
   @@map("sale_items")
 }
 
@@ -484,6 +489,7 @@ model CreditEntry {
 
   @@index([organizationId])
   @@index([customerId])
+  @@index([customerId, createdAt])  // ordered customer ledger
   @@map("credit_entries")
 }
 

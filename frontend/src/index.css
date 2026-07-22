@@ -8,16 +8,17 @@
   Every colour here is a STATUS SIGNAL, never decoration.
 */
 @theme {
-  /* Surfaces & text */
-  --color-ink: #0b1220; /* primary text; near-black, slightly blue — reads darker in glare */
-  --color-paper: #ffffff; /* surfaces; pure white for maximum contrast */
-  --color-field: #eef1f6; /* inputs & inactive surfaces */
-  --color-line: #c9d1de; /* borders — heavier than typical SaaS hairlines, which vanish on cheap panels */
-  --color-muted: #5b6879; /* secondary text */
+  /* Surfaces & text — Notion-white palette */
+  --color-ink: #37352f;     /* primary text: warm near-black, readable on any screen */
+  --color-paper: #ffffff;   /* content surface */
+  --color-sidebar: #f7f7f5; /* sidebar & chrome: warm off-white */
+  --color-field: #ebebea;   /* inputs, hover states, inactive surfaces */
+  --color-line: #e9e9e7;    /* borders: subtle, not invisible */
+  --color-muted: #787774;   /* secondary text */
 
-  /* Status colours */
+  /* Status colours — unchanged; these are signal, not decoration */
   --color-brand: #0b7a4b; /* primary action, confirmed payment, positive totals */
-  --color-warn: #b45309; /* offline, pending payment, low stock */
+  --color-warn: #b45309;  /* offline, pending payment, low stock */
   --color-danger: #b4231e; /* destructive, variance, expired stock */
 
   /* No rounded corners anywhere — sharp rectangles throughout. */
