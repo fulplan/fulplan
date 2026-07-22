@@ -252,10 +252,15 @@ export const salesRouter = router({
           amountTendered: true,
           change: true,
           paymentMethod: true,
+          cashAmount: true,
+          momoAmount: true,
+          note: true,
+          status: true,
           createdAt: true,
           cashier: { select: { name: true } },
           branch: { select: { name: true, receiptHeader: true } },
           organization: { select: { name: true } },
+          customer: { select: { name: true, phone: true } },
           items: {
             select: {
               name: true,
