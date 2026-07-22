@@ -228,22 +228,26 @@ function CustomerPicker({
     <div className="mb-4">
       <label className="mb-1.5 block text-sm font-medium">Customer</label>
       {value ? (
-        <div className="flex items-center justify-between border-2 border-ink bg-field px-3 py-2">
-          <div>
+        <div className="border-2 border-ink bg-field px-3 py-2">
+          <div className="flex items-center justify-between">
             <span className="text-sm font-semibold">{value.name}</span>
-            {value.balance > 0 && (
-              <span className="ml-2 text-xs text-danger">
-                owes {formatGhs(value.balance)}
+            <button
+              type="button"
+              onClick={() => { onChange(null); setSearch(''); setOpen(false); }}
+              className="text-sm text-muted hover:text-danger ml-2"
+            >
+              ×
+            </button>
+          </div>
+          <div className="mt-0.5 text-xs text-muted">
+            Balance: <span className={value.balance > 0 ? 'text-danger font-semibold' : ''}>{formatGhs(value.balance)}</span>
+            {value.creditLimit !== null && (
+              <span className="ml-2">
+                · Limit: {formatGhs(value.creditLimit)}
+                · Available: <span className={value.creditLimit - value.balance < 0 ? 'text-danger font-semibold' : 'text-brand'}>{formatGhs(Math.max(0, value.creditLimit - value.balance))}</span>
               </span>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => { onChange(null); setSearch(''); setOpen(false); }}
-            className="text-sm text-muted hover:text-danger"
-          >
-            ×
-          </button>
         </div>
       ) : (
         <div className="relative">
