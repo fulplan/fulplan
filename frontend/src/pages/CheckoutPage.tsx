@@ -73,17 +73,25 @@ function ProductTile({
 function CartPanel({
   items,
   total,
+  subtotal,
+  discount,
   onSetQty,
   onRemove,
   onCharge,
   onPark,
+  onDiscount,
+  onClearDiscount,
 }: {
   items: CartItem[];
   total: number;
+  subtotal: number;
+  discount: { amount: number; note: string } | null;
   onSetQty: (id: string, qty: number) => void;
   onRemove: (id: string) => void;
   onCharge: () => void;
   onPark?: () => void;
+  onDiscount?: () => void;
+  onClearDiscount?: () => void;
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -143,6 +151,23 @@ function CartPanel({
       )}
 
       <div className="border-t-2 border-ink px-4 py-4">
+        {discount && (
+          <div className="mb-2 flex items-center justify-between text-sm">
+            <span className="text-muted">Subtotal</span>
+            <span className="font-mono tabular-nums">{formatGhs(subtotal)}</span>
+          </div>
+        )}
+        {discount && (
+          <div className="mb-2 flex items-center justify-between text-sm">
+            <span className="text-danger">Discount</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono tabular-nums text-danger">−{formatGhs(discount.amount)}</span>
+              {onClearDiscount && (
+                <button onClick={onClearDiscount} className="text-xs text-muted hover:text-danger">×</button>
+              )}
+            </div>
+          </div>
+        )}
         <div className="mb-4 flex items-baseline justify-between">
           <span className="text-sm font-semibold uppercase tracking-wide text-muted">
             Total
@@ -151,14 +176,24 @@ function CartPanel({
             {formatGhs(total)}
           </span>
         </div>
-        {onPark && items.length > 0 && (
-          <button
-            onClick={onPark}
-            className="w-full border border-line py-2.5 text-sm font-medium text-muted hover:bg-field mb-2"
-          >
-            Park cart
-          </button>
-        )}
+        <div className="flex gap-2 mb-2">
+          {onDiscount && items.length > 0 && !discount && (
+            <button
+              onClick={onDiscount}
+              className="flex-1 border border-line py-2 text-xs font-medium text-muted hover:bg-field"
+            >
+              % Discount
+            </button>
+          )}
+          {onPark && items.length > 0 && (
+            <button
+              onClick={onPark}
+              className="flex-1 border border-line py-2 text-xs font-medium text-muted hover:bg-field"
+            >
+              Park
+            </button>
+          )}
+        </div>
         <button
           onClick={onCharge}
           disabled={items.length === 0}
@@ -257,12 +292,14 @@ function PaymentModal({
   total,
   branchId,
   cartItems,
+  discount,
   onComplete,
   onClose,
 }: {
   total: number;
   branchId: string;
   cartItems: CartItem[];
+  discount: { amount: number; note: string } | null;
   onComplete: (sale: SaleResult) => void;
   onClose: () => void;
 }) {
@@ -328,6 +365,8 @@ function PaymentModal({
       customerId: method === 'CREDIT' ? customer!.id : undefined,
       cashAmount: method === 'SPLIT' ? splitCash : undefined,
       momoAmount: method === 'SPLIT' ? splitMomo : undefined,
+      discountTotal: discount?.amount ?? 0,
+      discountNote: discount?.note,
       items: cartItems.map((i) => ({
         productId: i.productId,
         quantity: i.quantity,
@@ -634,6 +673,8 @@ function MobileCartOverlay({
         <CartPanel
           items={items}
           total={total}
+          subtotal={total}
+          discount={null}
           onSetQty={onSetQty}
           onRemove={onRemove}
           onCharge={() => { onClose(); onCharge(); }}
@@ -750,6 +791,131 @@ function ParkedDrawer({
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Discount overlay ──────────────────────────────────────────────────────────
+
+function DiscountOverlay({
+  subtotal,
+  needsPin,
+  onApply,
+  onClose,
+}: {
+  subtotal: number;
+  needsPin: boolean;
+  onApply: (amount: number, note: string) => void;
+  onClose: () => void;
+}) {
+  const [amountStr, setAmountStr] = useState('');
+  const [note, setNote] = useState('');
+  const [pin, setPin] = useState('');
+  const [err, setErr] = useState('');
+  const [approved, setApproved] = useState(!needsPin);
+  const [approverName, setApproverName] = useState('');
+
+  const verifyPin = trpc.staff.verifyManagerPin.useMutation({
+    onSuccess: (data) => {
+      setApproved(true);
+      setApproverName(data.approverName);
+      setErr('');
+    },
+    onError: (e) => setErr(e.message),
+  });
+
+  const amountPesewas = Math.round(parseFloat(amountStr || '0') * 100);
+  const validAmount = amountPesewas > 0 && amountPesewas <= subtotal;
+
+  function handleApply() {
+    if (!validAmount) { setErr('Enter a valid discount amount'); return; }
+    if (!note.trim()) { setErr('Enter a reason for the discount'); return; }
+    onApply(amountPesewas, note.trim() + (approverName ? ` (${approverName})` : ''));
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="w-full max-w-xs border-2 border-ink bg-paper p-5 space-y-3">
+        <p className="text-sm font-semibold">Apply discount</p>
+
+        <div>
+          <label className="mb-1 block text-xs text-muted uppercase tracking-wide">Amount (GH₵)</label>
+          <input
+            className="w-full border-2 border-ink bg-field px-3 py-2 text-lg font-mono tabular-nums focus:outline-none"
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0.01"
+            max={(subtotal / 100).toFixed(2)}
+            placeholder="0.00"
+            value={amountStr}
+            onChange={(e) => { setAmountStr(e.target.value); setErr(''); }}
+            autoFocus={!needsPin || approved}
+          />
+          {validAmount && (
+            <p className="text-xs text-muted mt-1">
+              Total after discount: {formatGhs(subtotal - amountPesewas)}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs text-muted uppercase tracking-wide">Reason</label>
+          <input
+            className="w-full border border-line bg-field px-3 py-2 text-sm"
+            placeholder="e.g. Damaged packaging, bulk buy"
+            value={note}
+            onChange={(e) => { setNote(e.target.value); setErr(''); }}
+          />
+        </div>
+
+        {needsPin && !approved && (
+          <div>
+            <label className="mb-1 block text-xs text-muted uppercase tracking-wide">Manager PIN</label>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 border border-line bg-field px-3 py-2 text-sm font-mono tracking-widest"
+                type="password"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="••••"
+                value={pin}
+                onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setErr(''); }}
+                autoFocus
+              />
+              <button
+                onClick={() => verifyPin.mutate({ pin })}
+                disabled={pin.length < 4 || verifyPin.isPending}
+                className="border-2 border-ink px-3 py-2 text-sm font-semibold disabled:opacity-40"
+              >
+                {verifyPin.isPending ? '…' : 'OK'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {approved && approverName && (
+          <p className="text-xs text-brand">✓ Approved by {approverName}</p>
+        )}
+
+        {err && <p className="text-xs text-danger">{err}</p>}
+
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={handleApply}
+            disabled={!approved || !validAmount || !note.trim()}
+            className="border-2 border-ink bg-ink px-4 py-2 text-sm font-semibold text-paper disabled:opacity-40"
+          >
+            Apply
+          </button>
+          <button onClick={onClose} className="px-4 py-2 text-sm hover:bg-field">
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -890,6 +1056,11 @@ export function CheckoutPage() {
   const { parked, park, resume, discard } = useParkedCarts();
 
   const canVoid = user?.role === 'OWNER' || user?.role === 'MANAGER';
+  const isCashier = user?.role === 'CASHIER';
+
+  // Discount state — approved by manager PIN if cashier, direct if manager/owner
+  const [discount, setDiscount] = useState<{ amount: number; note: string } | null>(null);
+  const [showDiscount, setShowDiscount] = useState(false);
 
   // Product search
   const [search, setSearch] = useState('');
@@ -1005,10 +1176,12 @@ export function CheckoutPage() {
     setCart((prev) => prev.filter((i) => i.productId !== productId));
   }
 
-  const cartTotal = cart.reduce(
+  const cartSubtotal = cart.reduce(
     (sum, i) => sum + i.sellingPrice * i.quantity,
     0,
   );
+  const discountAmount = discount ? Math.min(discount.amount, cartSubtotal) : 0;
+  const cartTotal = cartSubtotal - discountAmount;
   const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
 
   function handleSaleComplete(sale: SaleResult) {
@@ -1020,6 +1193,7 @@ export function CheckoutPage() {
   function startNewSale() {
     setLastSale(null);
     setCart([]);
+    setDiscount(null);
     searchRef.current?.focus();
   }
 
@@ -1132,10 +1306,14 @@ export function CheckoutPage() {
           <CartPanel
             items={cart}
             total={cartTotal}
+            subtotal={cartSubtotal}
+            discount={discount}
             onSetQty={setQty}
             onRemove={removeFromCart}
             onCharge={() => setShowPayment(true)}
             onPark={handlePark}
+            onDiscount={() => setShowDiscount(true)}
+            onClearDiscount={() => setDiscount(null)}
           />
         </div>
       </div>
@@ -1158,8 +1336,22 @@ export function CheckoutPage() {
           total={cartTotal}
           branchId={branchId}
           cartItems={cart}
+          discount={discount}
           onComplete={handleSaleComplete}
           onClose={() => setShowPayment(false)}
+        />
+      )}
+
+      {/* Discount overlay */}
+      {showDiscount && (
+        <DiscountOverlay
+          subtotal={cartSubtotal}
+          needsPin={isCashier}
+          onApply={(amount, note) => {
+            setDiscount({ amount, note });
+            setShowDiscount(false);
+          }}
+          onClose={() => setShowDiscount(false)}
         />
       )}
 

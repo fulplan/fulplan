@@ -151,6 +151,34 @@ export const staffRouter = router({
       return { ok: true };
     }),
 
+  /**
+   * Verify that a PIN belongs to a manager or owner in this org.
+   * Used by cashiers to get manager approval for discounts and overrides.
+   * Returns the approver's name and role on success; throws UNAUTHORIZED on failure.
+   */
+  verifyManagerPin: tenantProcedure
+    .input(z.object({ pin: z.string().min(4).max(6) }))
+    .mutation(async ({ ctx, input }) => {
+      const { verifySecret } = await import("../lib/password.js");
+      const candidates = await ctx.db.user.findMany({
+        where: {
+          organizationId: ctx.auth.organizationId,
+          active: true,
+          role: { in: ["MANAGER", "OWNER"] },
+          pinHash: { not: null },
+        },
+        select: { id: true, name: true, role: true, pinHash: true },
+      });
+
+      for (const user of candidates) {
+        if (user.pinHash && (await verifySecret(input.pin, user.pinHash))) {
+          return { approved: true, approverName: user.name, approverRole: user.role };
+        }
+      }
+
+      throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid manager PIN" });
+    }),
+
   setActive: managerProcedure
     .input(z.object({ userId: z.string().min(1), active: z.boolean() }))
     .mutation(async ({ ctx, input }) => {

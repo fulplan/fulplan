@@ -35,6 +35,9 @@ export const salesRouter = router({
           )
           .min(1, "Cart is empty"),
         note: z.string().trim().max(200).optional(),
+        // Manager-approved discount in pesewas (0 = no discount)
+        discountTotal: z.number().int().nonnegative().default(0),
+        discountNote: z.string().trim().max(200).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -105,7 +108,8 @@ export const salesRouter = router({
       });
 
       const subtotal = lineItems.reduce((sum, i) => sum + i.lineTotal, 0);
-      const total = subtotal; // no discounts at MVP
+      const discountTotal = Math.min(input.discountTotal, subtotal);
+      const total = subtotal - discountTotal;
 
       const effectiveTendered =
         input.paymentMethod === "SPLIT"
@@ -150,12 +154,15 @@ export const salesRouter = router({
             paymentMethod: input.paymentMethod,
             customerId: input.customerId,
             subtotal,
+            discountTotal,
             total,
             amountTendered: input.paymentMethod === "CREDIT" ? 0 : effectiveTendered,
             change,
             cashAmount,
             momoAmount,
-            note: input.note,
+            note: input.discountNote
+              ? `${input.note ? input.note + ' | ' : ''}Discount: ${input.discountNote}`
+              : input.note,
             items: {
               create: lineItems.map((li) => ({
                 productId: li.productId,
