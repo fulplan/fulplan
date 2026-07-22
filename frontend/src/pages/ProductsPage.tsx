@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { trpc } from '../lib/trpc';
 
@@ -102,6 +102,33 @@ function ProductModal({
   const [newCategory, setNewCategory] = useState('');
   const [error, setError] = useState('');
   const [showUnitFields, setShowUnitFields] = useState(false);
+  const [loaded, setLoaded] = useState(!editId);
+
+  // Load existing product data when editing
+  const existingQuery = trpc.products.get.useQuery(
+    { id: editId! },
+    { enabled: !!editId },
+  );
+
+  useEffect(() => {
+    if (existingQuery.data && !loaded) {
+      const data = existingQuery.data;
+      setForm({
+        name: data.name,
+        barcode: data.barcode ?? '',
+        categoryId: data.category?.id ?? '',
+        purchaseUnit: data.purchaseUnit,
+        saleUnit: data.saleUnit,
+        unitsPerPurchase: data.unitsPerPurchase,
+        costPrice: data.costPrice,
+        sellingPrice: data.sellingPrice,
+        lowStockThreshold: data.lowStockThreshold,
+        initialStock: 0,
+        branchId: defaultBranchId,
+      });
+      setLoaded(true);
+    }
+  }, [existingQuery.data, loaded]);
 
   const createCategory = trpc.categories.create.useMutation({
     onSuccess(cat) {
@@ -120,6 +147,14 @@ function ProductModal({
     onError(e) { setError(e.message); },
   });
 
+  const updateProduct = trpc.products.update.useMutation({
+    onSuccess() {
+      utils.products.list.invalidate();
+      onClose();
+    },
+    onError(e) { setError(e.message); },
+  });
+
   function set<K extends keyof ProductFormState>(key: K, value: ProductFormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
@@ -131,19 +166,44 @@ function ProductModal({
       setError('Selling price must be greater than zero');
       return;
     }
-    createProduct.mutate({
-      name: form.name.trim(),
-      barcode: form.barcode.trim() || undefined,
-      categoryId: form.categoryId || undefined,
-      purchaseUnit: form.purchaseUnit,
-      saleUnit: form.saleUnit,
-      unitsPerPurchase: form.unitsPerPurchase,
-      costPrice: form.costPrice,
-      sellingPrice: form.sellingPrice,
-      lowStockThreshold: form.lowStockThreshold,
-      initialStock: form.initialStock > 0 ? form.initialStock : undefined,
-      branchId: form.initialStock > 0 ? form.branchId : undefined,
-    });
+    if (editId) {
+      updateProduct.mutate({
+        id: editId,
+        name: form.name.trim(),
+        barcode: form.barcode.trim() || undefined,
+        categoryId: form.categoryId || undefined,
+        purchaseUnit: form.purchaseUnit,
+        saleUnit: form.saleUnit,
+        unitsPerPurchase: form.unitsPerPurchase,
+        costPrice: form.costPrice,
+        sellingPrice: form.sellingPrice,
+        lowStockThreshold: form.lowStockThreshold,
+      });
+    } else {
+      createProduct.mutate({
+        name: form.name.trim(),
+        barcode: form.barcode.trim() || undefined,
+        categoryId: form.categoryId || undefined,
+        purchaseUnit: form.purchaseUnit,
+        saleUnit: form.saleUnit,
+        unitsPerPurchase: form.unitsPerPurchase,
+        costPrice: form.costPrice,
+        sellingPrice: form.sellingPrice,
+        lowStockThreshold: form.lowStockThreshold,
+        initialStock: form.initialStock > 0 ? form.initialStock : undefined,
+        branchId: form.initialStock > 0 ? form.branchId : undefined,
+      });
+    }
+  }
+
+  const isPending = createProduct.isPending || updateProduct.isPending;
+
+  if (editId && !loaded && existingQuery.isLoading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40">
+        <div className="bg-paper border border-line p-6 text-sm text-muted">Loading…</div>
+      </div>
+    );
   }
 
   return (
@@ -355,10 +415,10 @@ function ProductModal({
             </button>
             <button
               type="submit"
-              disabled={createProduct.isPending}
+              disabled={isPending}
               className="flex-1 bg-brand py-2.5 text-sm font-semibold text-paper disabled:opacity-50"
             >
-              {createProduct.isPending ? 'Saving…' : 'Save product'}
+              {isPending ? 'Saving…' : editId ? 'Save changes' : 'Save product'}
             </button>
           </div>
         </form>
@@ -490,14 +550,20 @@ export function ProductsPage() {
   const canManage = user?.role === 'OWNER' || user?.role === 'MANAGER';
   const defaultBranchId = user?.branchId ?? '';
 
-  const products = trpc.products.list.useQuery({ includeInactive: false });
+  const [showInactive, setShowInactive] = useState(false);
+  const products = trpc.products.list.useQuery({ includeInactive: showInactive });
 
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [adjusting, setAdjusting] = useState<{
     id: string; name: string; saleUnit: string; stock: number
   } | null>(null);
   const [catalogMsg, setCatalogMsg] = useState('');
+
+  const setActive = trpc.products.setActive.useMutation({
+    onSuccess: () => products.refetch(),
+  });
 
   const importCatalog = trpc.products.importStarterCatalog.useMutation({
     onSuccess: (data) => {
@@ -529,6 +595,12 @@ export function ProductsPage() {
         />
         {canManage && (
           <>
+            <button
+              onClick={() => setShowInactive((v) => !v)}
+              className={`border px-3 py-2 text-xs font-medium whitespace-nowrap ${showInactive ? 'bg-ink text-paper border-ink' : 'border-line text-muted hover:bg-field'}`}
+            >
+              {showInactive ? 'Hide archived' : 'Show archived'}
+            </button>
             <button
               onClick={() => importCatalog.mutate({ branchId: defaultBranchId || undefined })}
               disabled={importCatalog.isPending}
@@ -638,19 +710,39 @@ export function ProductsPage() {
                     </td>
                     {canManage && (
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() =>
-                            setAdjusting({
-                              id: p.id,
-                              name: p.name,
-                              saleUnit: p.saleUnit,
-                              stock: p.stockQuantity ?? 0,
-                            })
-                          }
-                          className="border border-line px-2 py-1 text-xs hover:bg-field whitespace-nowrap"
-                        >
-                          Adjust stock
-                        </button>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => setEditId(p.id)}
+                            className="border border-line px-2 py-1 text-xs hover:bg-field"
+                          >
+                            Edit
+                          </button>
+                          {p.active && (
+                            <button
+                              onClick={() =>
+                                setAdjusting({
+                                  id: p.id,
+                                  name: p.name,
+                                  saleUnit: p.saleUnit,
+                                  stock: p.stockQuantity ?? 0,
+                                })
+                              }
+                              className="border border-line px-2 py-1 text-xs hover:bg-field whitespace-nowrap"
+                            >
+                              Stock
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setActive.mutate({ id: p.id, active: !p.active })}
+                            className={`border px-2 py-1 text-xs ${
+                              p.active
+                                ? 'border-line text-muted hover:border-danger hover:text-danger'
+                                : 'border-brand text-brand hover:bg-brand hover:text-paper'
+                            }`}
+                          >
+                            {p.active ? 'Archive' : 'Restore'}
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -667,6 +759,13 @@ export function ProductsPage() {
           editId={null}
           defaultBranchId={defaultBranchId}
           onClose={() => setShowAdd(false)}
+        />
+      )}
+      {editId && (
+        <ProductModal
+          editId={editId}
+          defaultBranchId={defaultBranchId}
+          onClose={() => setEditId(null)}
         />
       )}
       {adjusting && (
