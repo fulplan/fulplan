@@ -188,6 +188,108 @@ export const suppliersRouter = router({
       });
     }),
 
+  /**
+   * Receive a stock delivery from a supplier.
+   * Creates PURCHASE stock movements + updates StockLevel cache.
+   * Optionally creates a SupplierEntry (on-credit) or just logs the delivery.
+   */
+  receiveStock: managerProcedure
+    .input(
+      z.object({
+        supplierId: z.string(),
+        branchId: z.string(),
+        items: z
+          .array(
+            z.object({
+              productId: z.string(),
+              quantity: z.number().int().positive(),
+              costPrice: z.number().int().nonnegative(),
+            }),
+          )
+          .min(1),
+        onCredit: z.boolean().default(false),
+        note: z.string().trim().max(200).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const orgId = ctx.auth.organizationId;
+
+      // Verify supplier belongs to this org
+      const supplier = await ctx.prisma.supplier.findFirst({
+        where: { id: input.supplierId, organizationId: orgId },
+        select: { id: true, name: true },
+      });
+      if (!supplier) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Supplier not found" });
+      }
+
+      // Verify all products belong to this org
+      const productIds = input.items.map((i) => i.productId);
+      const products = await ctx.prisma.product.findMany({
+        where: { id: { in: productIds }, organizationId: orgId, active: true },
+        select: { id: true, name: true },
+      });
+      if (products.length !== productIds.length) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "One or more products not found" });
+      }
+
+      const totalValue = input.items.reduce(
+        (sum, i) => sum + i.costPrice * i.quantity,
+        0,
+      );
+
+      await ctx.prisma.$transaction(async (tx) => {
+        for (const item of input.items) {
+          await tx.stockMovement.create({
+            data: {
+              organizationId: orgId,
+              productId: item.productId,
+              branchId: input.branchId,
+              type: "PURCHASE",
+              quantity: item.quantity,
+              note: input.note ?? `Received from ${supplier.name}`,
+              createdById: ctx.auth.userId,
+            },
+          });
+
+          await tx.stockLevel.upsert({
+            where: { productId_branchId: { productId: item.productId, branchId: input.branchId } },
+            create: {
+              organizationId: orgId,
+              productId: item.productId,
+              branchId: input.branchId,
+              quantity: item.quantity,
+            },
+            update: { quantity: { increment: item.quantity } },
+          });
+
+          // Update cost price if supplied (helps keep margins accurate)
+          if (item.costPrice > 0) {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { costPrice: item.costPrice },
+            });
+          }
+        }
+
+        // Record the accounts-payable entry if received on credit
+        if (input.onCredit && totalValue > 0) {
+          await tx.supplierEntry.create({
+            data: {
+              organizationId: orgId,
+              supplierId: input.supplierId,
+              type: "PURCHASE",
+              amount: totalValue,
+              note: input.note ?? `Stock delivery (${input.items.length} line(s))`,
+              createdById: ctx.auth.userId,
+            },
+          });
+        }
+      });
+
+      return { ok: true, linesReceived: input.items.length, totalValue };
+    }),
+
   /** Record a payment to a supplier (reduces balance owed). */
   addPayment: managerProcedure
     .input(

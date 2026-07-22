@@ -122,7 +122,7 @@ function SupplierRow({
 
 // ── Supplier detail + ledger ───────────────────────────────────────────────
 
-type EntryAction = "purchase" | "payment" | null;
+type EntryAction = "receive" | "purchase" | "payment" | null;
 
 function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: () => void }) {
   const [action, setAction] = useState<EntryAction>(null);
@@ -150,7 +150,13 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
             </div>
           </div>
         </div>
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            className="px-4 py-2 bg-ink text-paper text-sm font-semibold"
+            onClick={() => setAction(action === "receive" ? null : "receive")}
+          >
+            Receive stock
+          </button>
           <button
             className="px-4 py-2 border border-line text-sm font-medium hover:bg-field"
             onClick={() => setAction(action === "purchase" ? null : "purchase")}
@@ -168,7 +174,15 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
         </div>
       </div>
 
-      {action && (
+      {action === "receive" && (
+        <ReceiveStockForm
+          supplierId={supplierId}
+          supplierName={data.name}
+          onDone={() => { setAction(null); refetch(); }}
+          onCancel={() => setAction(null)}
+        />
+      )}
+      {(action === "purchase" || action === "payment") && (
         <EntryForm
           supplierId={supplierId}
           type={action}
@@ -296,6 +310,217 @@ function EntryForm({
             onClick={onCancel}
             className="px-4 py-2 border border-line text-sm"
           >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ── Receive stock form ────────────────────────────────────────────────────────
+
+interface ReceiveLine {
+  productId: string;
+  productName: string;
+  quantity: number;
+  costPrice: number; // pesewas
+}
+
+function ReceiveStockForm({
+  supplierId,
+  supplierName,
+  onDone,
+  onCancel,
+}: {
+  supplierId: string;
+  supplierName: string;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const { data: branches } = trpc.branches.list.useQuery();
+  const { data: productsData } = trpc.products.list.useQuery({ branchId: undefined });
+
+  const [branchId, setBranchId] = useState<string>('');
+  const [lines, setLines] = useState<ReceiveLine[]>([]);
+  const [onCredit, setOnCredit] = useState(false);
+  const [note, setNote] = useState('');
+  const [productSearch, setProductSearch] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const products = productsData ?? [];
+  const filteredProducts = productSearch
+    ? products.filter((p) => p.name.toLowerCase().includes(productSearch.toLowerCase()))
+    : [];
+
+  // Auto-select first branch
+  useEffect(() => {
+    if (branches && branches.length > 0 && !branchId) {
+      setBranchId(branches[0]!.id);
+    }
+  }, [branches]);
+
+  const receive = trpc.suppliers.receiveStock.useMutation({
+    onSuccess: onDone,
+    onError: (err) => setError(err.message),
+  });
+
+  function addLine(p: typeof products[0]) {
+    setProductSearch('');
+    setLines((prev) => {
+      const existing = prev.find((l) => l.productId === p.id);
+      if (existing) {
+        return prev.map((l) =>
+          l.productId === p.id ? { ...l, quantity: l.quantity + 1 } : l,
+        );
+      }
+      return [...prev, { productId: p.id, productName: p.name, quantity: 1, costPrice: p.costPrice }];
+    });
+  }
+
+  function updateLine(idx: number, field: 'quantity' | 'costPrice', raw: string) {
+    const val = parseInt(field === 'costPrice' ? String(Math.round(parseFloat(raw) * 100)) : raw, 10);
+    if (isNaN(val) || val < 0) return;
+    setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, [field]: field === 'costPrice' ? Math.round(parseFloat(raw) * 100) : val } : l)));
+  }
+
+  function removeLine(idx: number) {
+    setLines((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!branchId) { setError('Select a branch'); return; }
+    if (lines.length === 0) { setError('Add at least one item'); return; }
+    receive.mutate({
+      supplierId,
+      branchId,
+      items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity, costPrice: l.costPrice })),
+      onCredit,
+      note: note.trim() || undefined,
+    });
+  }
+
+  const totalValue = lines.reduce((s, l) => s + l.costPrice * l.quantity, 0);
+
+  return (
+    <div className="border border-line p-4 mb-4 bg-field">
+      <h3 className="font-semibold text-sm mb-3">Receive stock from {supplierName}</h3>
+      <form onSubmit={handleSubmit} className="space-y-4">
+
+        {/* Branch */}
+        {branches && branches.length > 1 && (
+          <div>
+            <label className="block text-xs text-muted mb-1">Branch *</label>
+            <select
+              value={branchId}
+              onChange={(e) => setBranchId(e.target.value)}
+              className="w-full border border-line px-3 py-2 text-sm bg-paper"
+            >
+              <option value="">Select branch…</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Product search to add lines */}
+        <div>
+          <label className="block text-xs text-muted mb-1">Add product</label>
+          <input
+            type="search"
+            value={productSearch}
+            onChange={(e) => setProductSearch(e.target.value)}
+            placeholder="Search by product name…"
+            className="w-full border border-line px-3 py-2 text-sm"
+          />
+          {filteredProducts.length > 0 && (
+            <div className="border border-line bg-paper divide-y divide-line max-h-40 overflow-y-auto">
+              {filteredProducts.slice(0, 8).map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => addLine(p)}
+                  className="w-full px-3 py-2 text-sm text-left hover:bg-field flex justify-between"
+                >
+                  <span>{p.name}</span>
+                  <span className="text-xs text-muted font-mono">GH₵ {(p.costPrice / 100).toFixed(2)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Lines */}
+        {lines.length > 0 && (
+          <div className="border border-line divide-y divide-line">
+            <div className="grid grid-cols-[1fr_80px_100px_28px] gap-2 px-2 py-1 bg-field text-xs text-muted font-semibold uppercase">
+              <span>Product</span><span className="text-right">Qty</span><span className="text-right">Cost (GH₵)</span><span />
+            </div>
+            {lines.map((l, i) => (
+              <div key={l.productId} className="grid grid-cols-[1fr_80px_100px_28px] gap-2 px-2 py-2 items-center">
+                <span className="text-sm truncate">{l.productName}</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={l.quantity}
+                  onChange={(e) => updateLine(i, 'quantity', e.target.value)}
+                  className="border border-line px-1 py-1 text-sm text-right tabular-nums font-mono w-full"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={(l.costPrice / 100).toFixed(2)}
+                  onChange={(e) => updateLine(i, 'costPrice', e.target.value)}
+                  className="border border-line px-1 py-1 text-sm text-right tabular-nums font-mono w-full"
+                />
+                <button type="button" onClick={() => removeLine(i)} className="text-danger text-sm">×</button>
+              </div>
+            ))}
+            <div className="px-2 py-1 text-right text-xs font-semibold">
+              Total: GH₵ {(totalValue / 100).toFixed(2)}
+            </div>
+          </div>
+        )}
+
+        {/* On-credit toggle */}
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={onCredit}
+            onChange={(e) => setOnCredit(e.target.checked)}
+            className="w-4 h-4"
+          />
+          Record as credit (add to supplier balance)
+        </label>
+
+        {/* Note */}
+        <div>
+          <label className="block text-xs text-muted mb-1">Note (optional)</label>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. Invoice #1234"
+            className="w-full border border-line px-3 py-2 text-sm"
+            maxLength={200}
+          />
+        </div>
+
+        {error && <p className="text-danger text-xs">{error}</p>}
+
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={receive.isPending}
+            className="flex-1 py-2 bg-ink text-paper text-sm font-semibold disabled:opacity-50"
+          >
+            {receive.isPending ? "Saving…" : `Receive ${lines.length} item${lines.length !== 1 ? 's' : ''}`}
+          </button>
+          <button type="button" onClick={onCancel} className="px-4 py-2 border border-line text-sm">
             Cancel
           </button>
         </div>
