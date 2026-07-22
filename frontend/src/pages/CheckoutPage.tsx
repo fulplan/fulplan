@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../lib/auth-context';
+import { BarcodeScanner } from '../components/BarcodeScanner';
 import { trpc } from '../lib/trpc';
 
 // ── Money helpers ─────────────────────────────────────────────────────────────
@@ -1061,6 +1062,7 @@ export function CheckoutPage() {
   // Discount state — approved by manager PIN if cashier, direct if manager/owner
   const [discount, setDiscount] = useState<{ amount: number; note: string } | null>(null);
   const [showDiscount, setShowDiscount] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   // Product search
   const [search, setSearch] = useState('');
@@ -1133,6 +1135,19 @@ export function CheckoutPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products]);
+
+  // ── Camera barcode handler ──────────────────────────────────────────────────
+
+  function handleBarcodeDetect(code: string) {
+    setShowScanner(false);
+    const match = products.find((p) => p.barcode === code);
+    if (match) {
+      addToCart(match);
+    } else {
+      setSearch(code);
+      searchRef.current?.focus();
+    }
+  }
 
   // ── Cart operations ─────────────────────────────────────────────────────────
 
@@ -1253,15 +1268,22 @@ export function CheckoutPage() {
               )}
             </div>
             {view === 'products' && (
-              <div className="px-3 py-2">
+              <div className="px-3 py-2 flex gap-2">
                 <input
                   ref={searchRef}
                   type="search"
-                  placeholder="Search products or scan barcode…"
+                  placeholder="Search or scan barcode…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full bg-field border border-line px-3 py-2 text-sm focus:outline-none focus:border-ink"
+                  className="flex-1 min-w-0 bg-field border border-line px-3 py-2 text-sm focus:outline-none focus:border-ink"
                 />
+                <button
+                  onClick={() => setShowScanner(true)}
+                  title="Camera scan"
+                  className="border border-line px-3 py-2 text-sm hover:bg-field shrink-0"
+                >
+                  📷
+                </button>
               </div>
             )}
           </div>
@@ -1362,6 +1384,14 @@ export function CheckoutPage() {
           onResume={handleResume}
           onDiscard={discard}
           onClose={() => setShowParked(false)}
+        />
+      )}
+
+      {/* Camera barcode scanner */}
+      {showScanner && (
+        <BarcodeScanner
+          onDetect={handleBarcodeDetect}
+          onClose={() => setShowScanner(false)}
         />
       )}
     </div>
