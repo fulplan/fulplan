@@ -63,14 +63,27 @@ export const salesRouter = router({
         }
       }
 
-      // Validate customer belongs to this org
+      // Validate customer belongs to this org and load credit data
+      let creditLimitCheck: { limit: number; balance: number } | null = null;
       if (input.customerId) {
         const customer = await ctx.prisma.customer.findFirst({
           where: { id: input.customerId, organizationId: orgId },
-          select: { id: true },
+          select: {
+            id: true,
+            creditLimit: true,
+            creditEntries: { select: { type: true, amount: true } },
+          },
         });
         if (!customer) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Customer not found" });
+        }
+        if (input.paymentMethod === "CREDIT" && customer.creditLimit !== null) {
+          const currentBalance = customer.creditEntries.reduce(
+            (sum: number, e: { type: string; amount: number }) =>
+              sum + (e.type === "CHARGE" ? e.amount : -e.amount),
+            0,
+          );
+          creditLimitCheck = { limit: customer.creditLimit, balance: currentBalance };
         }
       }
 
@@ -121,6 +134,17 @@ export const salesRouter = router({
           code: "BAD_REQUEST",
           message: "Amount tendered is less than the total",
         });
+      }
+
+      // Enforce credit limit
+      if (creditLimitCheck !== null) {
+        if (creditLimitCheck.balance + total > creditLimitCheck.limit) {
+          const available = Math.max(0, creditLimitCheck.limit - creditLimitCheck.balance);
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Credit limit exceeded. Available credit: GH₵ ${(available / 100).toFixed(2)}`,
+          });
+        }
       }
 
       // Cash change only applies to pure-cash sales (no change on split or MoMo)
