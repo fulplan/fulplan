@@ -1,7 +1,7 @@
 import type { inferRouterOutputs } from '@trpc/server';
 import { useState } from 'react';
 import { useAuth } from '../lib/auth-context';
-import type { AppRouter } from '@ghpos/backend/src/routers';
+import type { AppRouter } from '@uptilll/backend/src/routers';
 import { trpc } from '../lib/trpc';
 
 type RouterOutput = inferRouterOutputs<AppRouter>;

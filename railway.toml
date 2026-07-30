@@ -1,10 +1,10 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm ci && npm run build --workspace=backend"
+buildCommand = "npm ci && npm run build --workspace=frontend && npm run build --workspace=backend"
 
 [deploy]
 startCommand = "npm run db:migrate:deploy --workspace=backend && npm run start --workspace=backend"
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 60
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3

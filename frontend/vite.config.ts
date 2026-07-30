@@ -26,9 +26,9 @@ export default defineConfig({
         ],
       },
       manifest: {
-        name: "GhPOS",
-        short_name: "GhPOS",
-        description: "Ghana Point of Sale — offline-capable retail POS",
+        name: "Uptilll",
+        short_name: "Uptilll",
+        description: "Uptilll — offline-capable retail POS for Ghana",
         theme_color: "#37352f",
         background_color: "#ffffff",
         display: "standalone",

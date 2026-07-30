@@ -1,5 +1,5 @@
 import type { inferRouterOutputs } from '@trpc/server';
-import type { AppRouter } from '@ghpos/backend/src/routers';
+import type { AppRouter } from '@uptilll/backend/src/routers';
 import { trpc } from '../lib/trpc';
 
 type RouterOutput = inferRouterOutputs<AppRouter>;
@@ -116,6 +116,9 @@ function InvoiceView({ sale }: { sale: SaleData }) {
           <p>This invoice is payable on presentation. Overdue accounts may incur interest.</p>
           {sale.note && <p className="mt-1 italic">Note: {sale.note}</p>}
           <p className="mt-3 opacity-50">Ref: {sale.id}</p>
+          <p className="mt-4 border-t border-line pt-3 opacity-40 text-[10px] text-center">
+            Powered by Uptilll · Built by Nik · +233 55 028 6773 / 020 572 9539
+          </p>
         </div>
       </div>
 
@@ -212,6 +215,9 @@ function ReceiptView({ sale }: { sale: SaleData }) {
         <div className="px-5 pb-5 text-center text-xs text-muted">
           <p>Thank you for your purchase!</p>
           <p className="mt-1 break-all opacity-50 text-[10px]">Ref: {sale.id}</p>
+          <p className="mt-3 border-t border-line pt-3 opacity-40 text-[10px]">
+            Powered by Uptilll · Built by Nik<br />+233 55 028 6773 / 020 572 9539
+          </p>
         </div>
       </div>
 

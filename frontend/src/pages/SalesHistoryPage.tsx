@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { trpc } from '../lib/trpc';
 import { useAuth } from '../lib/auth-context';
 import type { inferRouterOutputs } from '@trpc/server';
-import type { AppRouter } from '@ghpos/backend/src/routers';
+import type { AppRouter } from '@uptilll/backend/src/routers';
 
 type HistoryItem = inferRouterOutputs<AppRouter>['sales']['history']['items'][number];
 

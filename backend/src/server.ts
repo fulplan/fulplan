@@ -1,18 +1,22 @@
 import cors from "@fastify/cors";
+import fastifyStatic from "@fastify/static";
 import {
   fastifyTRPCPlugin,
   type FastifyTRPCPluginOptions,
 } from "@trpc/server/adapters/fastify";
 import Fastify from "fastify";
 import crypto from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { prisma } from "./db";
 import { createContext } from "./context";
 import { env, isProduction } from "./env";
 import { appRouter, type AppRouter } from "./routers";
 import { startCronJobs } from "./lib/cron";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const server = Fastify({
-  // tRPC encodes query input in the URL; the default limit is too small.
   routerOptions: { maxParamLength: 5000 },
   logger: isProduction
     ? true
@@ -29,11 +33,11 @@ await server.register(cors, {
   credentials: true,
 });
 
-/** Plain HTTP health check for Railway/uptime probes (not tRPC). */
-server.get("/health", async () => ({ ok: true, service: "ghpos-api" }));
+/** Health check for Railway/uptime probes. */
+server.get("/health", async () => ({ ok: true, service: "uptilll-api" }));
 
 // ── Paystack webhook ──────────────────────────────────────────────────────────
-// Must be registered BEFORE tRPC so the raw body is available.
+// Registered before tRPC so the raw body parser applies first.
 server.addContentTypeParser("application/json", { parseAs: "buffer" }, (req, body, done) => {
   done(null, body);
 });
@@ -49,10 +53,7 @@ server.post("/webhooks/paystack", async (req, reply) => {
   if (!signature) return reply.status(400).send({ error: "Missing signature" });
 
   const rawBody = req.body as Buffer;
-  const expected = crypto
-    .createHmac("sha512", secret)
-    .update(rawBody)
-    .digest("hex");
+  const expected = crypto.createHmac("sha512", secret).update(rawBody).digest("hex");
 
   if (signature !== expected) {
     server.log.warn("Paystack webhook: invalid signature");
@@ -73,7 +74,6 @@ server.post("/webhooks/paystack", async (req, reply) => {
       const meta = event.data.metadata as Record<string, unknown> | undefined;
       const organizationId = meta?.organizationId as string | undefined;
       if (organizationId) {
-        // Activate subscription for 30 days from today
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 30);
         await prisma.organization.updateMany({
@@ -92,14 +92,13 @@ server.post("/webhooks/paystack", async (req, reply) => {
           where: { id: organizationId, deletedAt: null },
           data: { subscriptionStatus: "LOCKED" },
         });
-        server.log.info({ organizationId }, "Paystack subscription.disable: org expired");
+        server.log.info({ organizationId }, "Paystack subscription.disable: org locked");
       }
     }
   } catch (err) {
     server.log.error({ err }, "Error processing Paystack webhook");
   }
 
-  // Always return 200 so Paystack stops retrying
   return reply.status(200).send({ ok: true });
 });
 
@@ -113,6 +112,30 @@ await server.register(fastifyTRPCPlugin, {
       server.log.error({ path, err: error }, "tRPC procedure failed");
     },
   } satisfies FastifyTRPCPluginOptions<AppRouter>["trpcOptions"],
+});
+
+// ── Frontend SPA ──────────────────────────────────────────────────────────────
+// Serve the built Vite app. In production Railway builds both packages;
+// the frontend dist lands at ../../frontend/dist relative to this file.
+const frontendDist = path.resolve(__dirname, "../../frontend/dist");
+
+await server.register(fastifyStatic, {
+  root: frontendDist,
+  prefix: "/",
+  // Don't 404 on missing assets — fall through to the SPA catch-all below
+  wildcard: false,
+});
+
+// SPA catch-all: any non-API, non-asset path returns index.html
+server.setNotFoundHandler(async (req, reply) => {
+  if (
+    req.url.startsWith("/trpc") ||
+    req.url.startsWith("/health") ||
+    req.url.startsWith("/webhooks")
+  ) {
+    return reply.status(404).send({ error: "Not found" });
+  }
+  return reply.sendFile("index.html", frontendDist);
 });
 
 // ── Startup ───────────────────────────────────────────────────────────────────

@@ -16,7 +16,7 @@ export interface PendingSale {
   attempts: number;
 }
 
-const DB_NAME  = "ghpos-offline";
+const DB_NAME  = "uptilll-offline";
 const DB_VER   = 1;
 const STORE    = "pending_sales";
 
