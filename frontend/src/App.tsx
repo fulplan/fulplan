@@ -7,9 +7,10 @@ import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { PinScreen } from './pages/PinScreen';
 import { SignupPage } from './pages/SignupPage';
+import { SuperAdminPage } from './pages/SuperAdminPage';
 import type { SessionUser } from './lib/auth-context';
 
-type Screen = 'loading' | 'landing' | 'login' | 'signup' | 'pin' | 'dashboard';
+type Screen = 'loading' | 'landing' | 'login' | 'signup' | 'pin' | 'dashboard' | 'superadmin';
 
 // Referral code from ?ref= URL param — captured once on load.
 const urlRef = new URLSearchParams(window.location.search).get('ref') ?? '';
@@ -93,7 +94,11 @@ export function App() {
   }
 
   if (screen === 'dashboard') {
-    return <Dashboard />;
+    return <Dashboard onEnterAdmin={() => setScreen('superadmin')} />;
+  }
+
+  if (screen === 'superadmin') {
+    return <SuperAdminPage onBack={() => setScreen('dashboard')} />;
   }
 
   // 'login' (default)

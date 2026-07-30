@@ -155,7 +155,7 @@ export const authRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const limitKey = `login:${input.email}`;
-      const limit = checkRateLimit(limitKey);
+      const limit = await checkRateLimit(limitKey);
       if (!limit.allowed) {
         throw new TRPCError({
           code: "TOO_MANY_REQUESTS",
@@ -192,11 +192,11 @@ export const authRouter = router({
       }
 
       if (matches.length === 0) {
-        recordFailure(limitKey);
+        await recordFailure(limitKey);
         throw INVALID_CREDENTIALS;
       }
 
-      clearAttempts(limitKey);
+      await clearAttempts(limitKey);
 
       if (matches.length > 1) {
         return {
@@ -255,7 +255,7 @@ export const authRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const limitKey = `pin:${input.userId}`;
-      const limit = checkRateLimit(limitKey);
+      const limit = await checkRateLimit(limitKey);
       if (!limit.allowed) {
         throw new TRPCError({
           code: "TOO_MANY_REQUESTS",
@@ -282,11 +282,11 @@ export const authRouter = router({
       });
 
       if (!user || !(await verifySecret(user.pinHash, input.pin))) {
-        recordFailure(limitKey);
+        await recordFailure(limitKey);
         throw INVALID_CREDENTIALS;
       }
 
-      clearAttempts(limitKey);
+      await clearAttempts(limitKey);
 
       let device: { deviceId: string; deviceToken: string } | null = null;
       if (input.deviceLabel) {

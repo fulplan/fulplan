@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { trpc } from '../lib/trpc';
+import { submitSale, OfflineError } from '../lib/sale-sync';
+import { useOnline } from '../lib/use-online';
 
 // ── Money helpers ─────────────────────────────────────────────────────────────
 
@@ -226,9 +228,9 @@ function CustomerPicker({
 
   return (
     <div className="mb-4">
-      <label className="mb-1.5 block text-sm font-medium">Customer</label>
+      <label className="mb-1.5 block text-xs text-muted uppercase tracking-wide">Customer</label>
       {value ? (
-        <div className="border-2 border-ink bg-field px-3 py-2">
+        <div className="border border-line bg-field px-3 py-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold">{value.name}</span>
             <button
@@ -257,7 +259,7 @@ function CustomerPicker({
             value={search}
             onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
             onFocus={() => setOpen(true)}
-            className="w-full border-2 border-ink bg-field px-3 py-2 text-sm focus:outline-none"
+            className="w-full border border-line bg-field px-3 py-2 text-sm focus:outline-none focus:border-ink"
           />
           {open && data && data.customers.length > 0 && (
             <div className="absolute z-10 w-full border border-line bg-paper shadow-md">
@@ -312,10 +314,12 @@ function PaymentModal({
   const [tenderedStr, setTenderedStr] = useState('');
   const [splitCashStr, setSplitCashStr] = useState('');
   const [error, setError] = useState('');
+  const [offlineSaved, setOfflineSaved] = useState(false);
   const [customer, setCustomer] = useState<{
     id: string; name: string; balance: number; creditLimit: number | null;
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isOnline = useOnline();
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -352,7 +356,7 @@ function PaymentModal({
     (method === 'CASH' && tenderedPesewas >= total && tenderedPesewas > 0) ||
     (method === 'SPLIT' && splitCash > 0 && splitCash < total);
 
-  function confirm() {
+  async function confirm() {
     if (!canConfirm) return;
     if (method === 'CREDIT' && !customer) {
       setError('Select a customer for a credit sale');
@@ -363,7 +367,7 @@ function PaymentModal({
       return;
     }
     setError('');
-    completeMutation.mutate({
+    const saleInput = {
       branchId,
       paymentMethod: method,
       amountTendered: method === 'CASH' ? tenderedPesewas : 0,
@@ -376,7 +380,16 @@ function PaymentModal({
         productId: i.productId,
         quantity: i.quantity,
       })),
-    });
+    };
+    try {
+      await submitSale(saleInput, (input) => completeMutation.mutateAsync(input));
+    } catch (err) {
+      if (err instanceof OfflineError) {
+        setOfflineSaved(true);
+        return;
+      }
+      // handled by onError above
+    }
   }
 
   return (
@@ -384,24 +397,24 @@ function PaymentModal({
       className="fixed inset-0 z-50 flex items-end justify-center bg-ink/50 p-4 md:items-center"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-w-sm border-2 border-ink bg-paper">
-        <div className="border-b-2 border-ink px-5 py-4">
-          <h2 className="text-lg font-semibold">Complete sale</h2>
-          <p className="mt-0.5 font-mono text-2xl font-bold tabular-nums">
+      <div className="w-full max-w-sm border border-line bg-paper">
+        <div className="border-b border-line px-5 py-4">
+          <p className="text-xs text-muted uppercase tracking-[0.14em] font-bold">Complete sale</p>
+          <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-ink">
             {formatGhs(total)}
           </p>
         </div>
 
         <div className="px-5 py-4">
           {/* Payment method toggle */}
-          <div className="mb-5 grid grid-cols-4 border-2 border-ink">
+          <div className="mb-5 grid grid-cols-4 border border-line">
             {(['CASH', 'MOMO', 'SPLIT', 'CREDIT'] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => { setMethod(m); setError(''); }}
                 className={[
-                  'py-3 text-xs font-semibold transition-colors',
-                  method === m ? 'bg-ink text-paper' : 'bg-paper text-ink hover:bg-field',
+                  'py-2.5 text-xs font-semibold transition-colors',
+                  method === m ? 'bg-ink text-paper' : 'bg-paper text-muted hover:bg-field hover:text-ink',
                 ].join(' ')}
               >
                 {m === 'CASH' ? 'Cash' : m === 'MOMO' ? 'MoMo' : m === 'SPLIT' ? 'Split' : 'Credit'}
@@ -412,7 +425,7 @@ function PaymentModal({
           {/* Cash: amount tendered */}
           {method === 'CASH' && (
             <div className="mb-4">
-              <label className="mb-1.5 block text-sm font-medium">
+              <label className="text-xs text-muted uppercase tracking-wide block mb-1.5">
                 Amount tendered (GH₵)
               </label>
               <input
@@ -425,7 +438,7 @@ function PaymentModal({
                 value={tenderedStr}
                 onChange={(e) => { setTenderedStr(e.target.value); setError(''); }}
                 onKeyDown={(e) => e.key === 'Enter' && confirm()}
-                className="w-full border-2 border-ink bg-field px-3 py-2 text-lg font-mono tabular-nums focus:outline-none"
+                className="w-full border border-line bg-field px-3 py-2 text-lg font-mono tabular-nums focus:outline-none focus:border-ink"
               />
               {tenderedPesewas >= total && tenderedPesewas > 0 && (
                 <div className="mt-3 flex justify-between border border-brand bg-paper px-3 py-2">
@@ -452,7 +465,7 @@ function PaymentModal({
             <div className="mb-4 space-y-3">
               <p className="text-xs text-muted">Enter how much the customer pays in cash. The rest will be MoMo.</p>
               <div>
-                <label className="mb-1.5 block text-sm font-medium">Cash amount (GH₵)</label>
+                <label className="text-xs text-muted uppercase tracking-wide block mb-1.5">Cash amount (GH₵)</label>
                 <input
                   ref={inputRef}
                   type="number"
@@ -464,7 +477,7 @@ function PaymentModal({
                   value={splitCashStr}
                   onChange={(e) => { setSplitCashStr(e.target.value); setError(''); }}
                   onKeyDown={(e) => e.key === 'Enter' && confirm()}
-                  className="w-full border-2 border-ink bg-field px-3 py-2 text-lg font-mono tabular-nums focus:outline-none"
+                  className="w-full border border-line bg-field px-3 py-2 text-lg font-mono tabular-nums focus:outline-none focus:border-ink"
                 />
               </div>
               {splitCash > 0 && splitCash < total && (
@@ -495,6 +508,19 @@ function PaymentModal({
             </div>
           )}
 
+          {!isOnline && (
+            <div className="mb-3 flex items-center gap-2 rounded border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-warn">
+              <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/></svg>
+              Offline — sale will be saved locally and synced when reconnected
+            </div>
+          )}
+
+          {offlineSaved && (
+            <div className="mb-3 flex items-center gap-2 rounded border border-brand/40 bg-brand/10 px-3 py-2 text-xs text-brand">
+              Sale saved offline. It will sync automatically when you reconnect.
+            </div>
+          )}
+
           {error && (
             <p className="mb-3 text-sm text-danger">{error}</p>
           )}
@@ -503,16 +529,16 @@ function PaymentModal({
             <button
               onClick={onClose}
               disabled={completeMutation.isPending}
-              className="border-2 border-ink py-3 text-sm font-semibold hover:bg-field disabled:opacity-50"
+              className="border border-line py-2.5 text-sm text-muted hover:bg-field hover:text-ink disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               onClick={confirm}
-              disabled={!canConfirm || completeMutation.isPending}
-              className="bg-brand py-3 text-sm font-semibold text-paper disabled:opacity-30 hover:opacity-90"
+              disabled={!canConfirm || completeMutation.isPending || offlineSaved}
+              className="bg-ink py-2.5 text-sm font-semibold text-paper disabled:opacity-30 hover:opacity-80"
             >
-              {completeMutation.isPending ? 'Saving…' : 'Confirm ✓'}
+              {completeMutation.isPending ? 'Saving…' : !isOnline ? 'Save Offline' : 'Confirm ✓'}
             </button>
           </div>
         </div>
@@ -537,8 +563,8 @@ function ReceiptSummary({
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-6">
-      <div className="w-full max-w-sm border-2 border-brand">
-        <div className="border-b-2 border-brand bg-brand px-5 py-5 text-paper">
+      <div className="w-full max-w-sm border border-brand">
+        <div className="border-b border-brand bg-brand px-5 py-5 text-paper">
           <p className="text-4xl font-bold">✓</p>
           <p className="mt-1 text-xl font-semibold">Sale complete</p>
         </div>
@@ -760,9 +786,9 @@ function ParkedDrawer({
       className="fixed inset-0 z-40 flex items-end justify-center bg-ink/50 p-4 md:items-center"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-w-sm border-2 border-ink bg-paper">
-        <div className="flex items-center justify-between border-b-2 border-ink px-4 py-3">
-          <h2 className="text-sm font-semibold">Parked carts</h2>
+      <div className="w-full max-w-sm border border-line bg-paper">
+        <div className="flex items-center justify-between border-b border-line px-4 py-3">
+          <h2 className="text-sm font-semibold text-ink">Parked carts</h2>
           <button onClick={onClose} className="text-sm text-muted hover:text-ink">Close</button>
         </div>
         {carts.length === 0 ? (
@@ -781,7 +807,7 @@ function ParkedDrawer({
                 <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => onResume(c.id)}
-                    className="border-2 border-ink px-3 py-1.5 text-xs font-semibold hover:bg-field"
+                    className="border border-line px-3 py-1.5 text-xs font-semibold text-muted hover:bg-field hover:text-ink"
                   >
                     Resume
                   </button>
@@ -844,13 +870,16 @@ function DiscountOverlay({
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-w-xs border-2 border-ink bg-paper p-5 space-y-3">
-        <p className="text-sm font-semibold">Apply discount</p>
+      <div className="w-full max-w-xs border border-line bg-paper">
+        <div className="border-b border-line px-4 py-3">
+          <p className="text-sm font-semibold text-ink">Apply discount</p>
+        </div>
+        <div className="p-4 space-y-3">
 
         <div>
           <label className="mb-1 block text-xs text-muted uppercase tracking-wide">Amount (GH₵)</label>
           <input
-            className="w-full border-2 border-ink bg-field px-3 py-2 text-lg font-mono tabular-nums focus:outline-none"
+            className="w-full border border-line bg-field px-3 py-2 text-lg font-mono tabular-nums focus:outline-none focus:border-ink"
             type="number"
             inputMode="decimal"
             step="0.01"
@@ -895,7 +924,7 @@ function DiscountOverlay({
               <button
                 onClick={() => verifyPin.mutate({ pin })}
                 disabled={pin.length < 4 || verifyPin.isPending}
-                className="border-2 border-ink px-3 py-2 text-sm font-semibold disabled:opacity-40"
+                className="border border-line px-3 py-2 text-sm font-semibold text-muted hover:bg-field hover:text-ink disabled:opacity-40"
               >
                 {verifyPin.isPending ? '…' : 'OK'}
               </button>
@@ -913,13 +942,14 @@ function DiscountOverlay({
           <button
             onClick={handleApply}
             disabled={!approved || !validAmount || !note.trim()}
-            className="border-2 border-ink bg-ink px-4 py-2 text-sm font-semibold text-paper disabled:opacity-40"
+            className="bg-ink px-4 py-2 text-sm font-semibold text-paper hover:opacity-80 disabled:opacity-40"
           >
             Apply
           </button>
-          <button onClick={onClose} className="px-4 py-2 text-sm hover:bg-field">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-muted hover:bg-field hover:text-ink">
             Cancel
           </button>
+        </div>
         </div>
       </div>
     </div>

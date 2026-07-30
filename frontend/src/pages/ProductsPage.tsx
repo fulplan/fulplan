@@ -648,7 +648,7 @@ export function ProductsPage() {
                       <button
                         onClick={() => importCatalog.mutate({ branchId: defaultBranchId || undefined })}
                         disabled={importCatalog.isPending}
-                        className="border-2 border-ink px-5 py-2.5 text-sm font-semibold hover:bg-field disabled:opacity-50"
+                        className="border border-line px-5 py-2.5 text-sm font-semibold text-ink hover:bg-field disabled:opacity-50"
                       >
                         {importCatalog.isPending ? 'Importing…' : 'Import starter catalog'}
                       </button>

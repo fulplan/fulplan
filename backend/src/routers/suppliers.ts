@@ -30,9 +30,6 @@ export const suppliersRouter = router({
               ]
             : undefined,
         },
-        include: {
-          entries: { select: { type: true, amount: true } },
-        },
         orderBy: { name: "asc" },
         take: input.limit + 1,
         cursor: input.cursor ? { id: input.cursor } : undefined,
@@ -41,6 +38,26 @@ export const suppliersRouter = router({
       let nextCursor: string | undefined;
       if (suppliers.length > input.limit) {
         nextCursor = suppliers.pop()!.id;
+      }
+
+      // Aggregate supplier balances in SQL — one query, no in-memory scan
+      const supplierIds = suppliers.map((s) => s.id);
+      const balanceAgg = supplierIds.length > 0
+        ? await ctx.prisma.supplierEntry.groupBy({
+            by: ["supplierId", "type"],
+            where: { supplierId: { in: supplierIds } },
+            _sum: { amount: true },
+          })
+        : [];
+
+      const balanceMap = new Map<string, number>();
+      for (const row of balanceAgg) {
+        const prev = balanceMap.get(row.supplierId) ?? 0;
+        const delta = row._sum.amount ?? 0;
+        balanceMap.set(
+          row.supplierId,
+          row.type === "PURCHASE" ? prev + delta : prev - delta
+        );
       }
 
       return {
@@ -52,7 +69,7 @@ export const suppliersRouter = router({
           notes: s.notes,
           active: s.active,
           createdAt: s.createdAt,
-          balance: computeBalance(s.entries),
+          balance: balanceMap.get(s.id) ?? 0,
         })),
         nextCursor,
       };

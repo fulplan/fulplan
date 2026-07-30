@@ -57,12 +57,17 @@ export function SettingsPage() {
   const isOwner = user?.role === "OWNER";
 
   return (
-    <div className="p-4 max-w-2xl mx-auto space-y-8">
-      <h1 className="text-xl font-bold">Settings</h1>
-      {isOwner && <OrgProfileSection />}
-      <BranchSettingsSection isOwner={isOwner} />
-      <ExportSection />
-      {isOwner && <DangerZone />}
+    <div className="flex flex-col min-h-full">
+      <div className="border-b border-line px-6 py-4 bg-paper">
+        <h1 className="text-sm font-semibold text-ink">Settings</h1>
+        <p className="text-xs text-muted mt-0.5">Organisation, branches, and data export</p>
+      </div>
+      <div className="px-6 py-4 max-w-2xl space-y-8">
+        {isOwner && <OrgProfileSection />}
+        <BranchSettingsSection isOwner={isOwner} />
+        <ExportSection />
+        {isOwner && <DangerZone />}
+      </div>
     </div>
   );
 }
@@ -98,27 +103,27 @@ function OrgProfileSection() {
 
   return (
     <section>
-      <h2 className="font-semibold text-sm mb-3">Organisation</h2>
-      <div className="border border-line p-4">
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted mb-3">Organisation</p>
+      <div className="border border-line">
         {editing ? (
-          <form onSubmit={handleSubmit} className="space-y-3">
+          <form onSubmit={handleSubmit} className="p-4 space-y-3">
             <div>
               <label className="block text-xs text-muted mb-1">Business name</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full border border-line px-3 py-2 text-sm"
+                className="w-full border border-line bg-field px-3 py-2 text-sm focus:outline-none focus:border-ink"
                 maxLength={100}
                 autoFocus
               />
             </div>
             {error && <p className="text-danger text-xs">{error}</p>}
             <div className="flex gap-2">
-              <button type="submit" disabled={update.isPending} className="px-4 py-2 bg-ink text-paper text-sm font-semibold disabled:opacity-50">
+              <button type="submit" disabled={update.isPending} className="px-4 py-2 bg-ink text-paper text-sm font-semibold hover:opacity-80 disabled:opacity-50">
                 {update.isPending ? "Saving…" : "Save"}
               </button>
-              <button type="button" onClick={() => setEditing(false)} className="px-4 py-2 border border-line text-sm">
+              <button type="button" onClick={() => setEditing(false)} className="px-4 py-2 border border-line text-sm text-muted hover:bg-field hover:text-ink">
                 Cancel
               </button>
             </div>
@@ -159,9 +164,9 @@ function BranchSettingsSection({ isOwner }: { isOwner: boolean }) {
   return (
     <section>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="font-semibold text-sm">Branches</h2>
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Branches</p>
         {isOwner && (
-          <button onClick={() => setAdding(true)} className="px-3 py-1 text-xs border border-ink font-medium hover:bg-field">
+          <button onClick={() => setAdding(true)} className="px-3 py-1 text-xs border border-line text-muted hover:bg-field hover:text-ink">
             + Add branch
           </button>
         )}
@@ -231,7 +236,7 @@ function BranchEditRow({
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full border border-line px-2 py-1.5 text-sm"
+          className="w-full border border-line bg-field px-2 py-1.5 text-sm focus:outline-none focus:border-ink"
           placeholder="e.g. Main Store"
           autoFocus
           maxLength={100}
@@ -243,7 +248,7 @@ function BranchEditRow({
           type="text"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          className="w-full border border-line px-2 py-1.5 text-sm"
+          className="w-full border border-line bg-field px-2 py-1.5 text-sm focus:outline-none focus:border-ink"
           placeholder="Optional"
           maxLength={200}
         />
@@ -254,17 +259,17 @@ function BranchEditRow({
           type="text"
           value={header}
           onChange={(e) => setHeader(e.target.value)}
-          className="w-full border border-line px-2 py-1.5 text-sm"
+          className="w-full border border-line bg-field px-2 py-1.5 text-sm focus:outline-none focus:border-ink"
           placeholder="Printed at top of receipts (optional)"
           maxLength={200}
         />
       </div>
       {error && <p className="text-danger text-xs">{error}</p>}
       <div className="flex gap-2">
-        <button type="submit" disabled={isSaving} className="px-3 py-1.5 bg-ink text-paper text-sm font-semibold disabled:opacity-50">
+        <button type="submit" disabled={isSaving} className="px-3 py-1.5 bg-ink text-paper text-sm font-semibold hover:opacity-80 disabled:opacity-50">
           {isSaving ? "Saving…" : "Save"}
         </button>
-        <button type="button" onClick={onCancel} className="px-3 py-1.5 border border-line text-sm">
+        <button type="button" onClick={onCancel} className="px-3 py-1.5 border border-line text-sm text-muted hover:bg-field hover:text-ink">
           Cancel
         </button>
       </div>
@@ -306,7 +311,7 @@ function ExportSection() {
 
   return (
     <section>
-      <h2 className="font-semibold text-sm mb-3">Export data</h2>
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted mb-3">Export data</p>
       <div className="border border-line divide-y divide-line">
 
         {/* Sales */}
@@ -436,7 +441,7 @@ function DangerZone() {
 
   return (
     <section>
-      <h2 className="font-semibold text-sm mb-3 text-danger">Danger zone</h2>
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-danger mb-3">Danger zone</p>
       <div className="border border-danger p-4 space-y-3">
 
         {status?.scheduled ? (

@@ -85,24 +85,28 @@ export function StaffPage() {
   const inactive = staffList?.filter((s) => !s.active) ?? [];
 
   return (
-    <div className="p-5 max-w-2xl">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-semibold">Staff</h2>
+    <div className="flex flex-col min-h-full">
+      <div className="border-b border-line px-6 py-4 bg-paper flex items-center justify-between">
+        <div>
+          <h1 className="text-sm font-semibold text-ink">Staff</h1>
+          <p className="text-xs text-muted mt-0.5">Manage staff accounts and roles</p>
+        </div>
         <button
           onClick={() => { setShowAdd(true); setErr(''); }}
-          className="border-2 border-ink px-4 py-2 text-sm font-semibold hover:bg-field"
+          className="px-4 py-1.5 bg-ink text-paper text-sm font-semibold hover:opacity-80"
         >
           + Add staff
         </button>
       </div>
+      <div className="px-6 py-4 max-w-2xl">
 
       {/* Add staff form */}
       {showAdd && (
         <form
           onSubmit={handleCreate}
-          className="border-2 border-ink p-4 mb-5 space-y-3"
+          className="border border-line p-5 mb-5 space-y-3 bg-field/30"
         >
-          <p className="text-sm font-semibold">New staff member</p>
+          <p className="text-sm font-semibold text-ink">New staff member</p>
 
           <div className="space-y-1">
             <label className="text-xs text-muted uppercase tracking-wide">Name</label>
@@ -191,14 +195,14 @@ export function StaffPage() {
             <button
               type="submit"
               disabled={createMut.isPending}
-              className="border-2 border-ink px-4 py-2 text-sm font-semibold bg-ink text-paper hover:opacity-90 disabled:opacity-50"
+              className="px-4 py-2 text-sm font-semibold bg-ink text-paper hover:opacity-80 disabled:opacity-50"
             >
               {createMut.isPending ? 'Adding…' : 'Add staff'}
             </button>
             <button
               type="button"
               onClick={() => { setShowAdd(false); setErr(''); }}
-              className="px-4 py-2 text-sm hover:bg-field"
+              className="px-4 py-2 text-sm border border-line text-muted hover:bg-field hover:text-ink"
             >
               Cancel
             </button>
@@ -209,8 +213,11 @@ export function StaffPage() {
       {/* Change PIN modal */}
       {pinTarget && (
         <div className="fixed inset-0 bg-ink/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-paper border-2 border-ink p-5 w-full max-w-xs space-y-3">
-            <p className="text-sm font-semibold">Change PIN — {pinTarget.name}</p>
+          <div className="bg-paper border border-line w-full max-w-xs">
+            <div className="border-b border-line px-4 py-3">
+              <p className="text-sm font-semibold text-ink">Change PIN — {pinTarget.name}</p>
+            </div>
+            <div className="p-4 space-y-3">
             <input
               className="w-full border border-line bg-field px-3 py-2 text-sm font-mono tracking-widest"
               type="password"
@@ -229,16 +236,17 @@ export function StaffPage() {
                   setPinMut.mutate({ userId: pinTarget.id, pin: newPin });
                 }}
                 disabled={setPinMut.isPending || newPin.length < 4}
-                className="border-2 border-ink px-4 py-2 text-sm font-semibold bg-ink text-paper disabled:opacity-50"
+                className="px-4 py-2 text-sm font-semibold bg-ink text-paper hover:opacity-80 disabled:opacity-50"
               >
                 {setPinMut.isPending ? 'Saving…' : 'Save PIN'}
               </button>
               <button
                 onClick={() => { setPinTarget(null); setNewPin(''); setErr(''); }}
-                className="px-4 py-2 text-sm hover:bg-field"
+                className="px-4 py-2 text-sm border border-line text-muted hover:bg-field hover:text-ink"
               >
                 Cancel
               </button>
+            </div>
             </div>
           </div>
         </div>
@@ -268,6 +276,7 @@ export function StaffPage() {
           />
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -53,6 +53,72 @@ export const productsRouter = router({
       }));
     }),
 
+  /**
+   * Paginated product search — use this in admin/reports UIs that may have
+   * thousands of SKUs. The POS checkout keeps using `list` for offline-capable
+   * local search.
+   */
+  search: tenantProcedure
+    .input(
+      z.object({
+        q: z.string().trim().optional(),
+        branchId: z.string().optional(),
+        includeInactive: z.boolean().default(false),
+        limit: z.number().int().positive().max(100).default(50),
+        cursor: z.string().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const branchId = input.branchId ?? ctx.auth.branchId ?? null;
+      const products = await ctx.db.product.findMany({
+        where: {
+          ...(input.includeInactive ? {} : { active: true }),
+          ...(input.q
+            ? {
+                OR: [
+                  { name: { contains: input.q, mode: "insensitive" } },
+                  { barcode: { contains: input.q, mode: "insensitive" } },
+                ],
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          name: true,
+          barcode: true,
+          categoryId: true,
+          category: { select: { id: true, name: true } },
+          purchaseUnit: true,
+          saleUnit: true,
+          unitsPerPurchase: true,
+          costPrice: true,
+          sellingPrice: true,
+          lowStockThreshold: true,
+          active: true,
+          stockLevels: branchId
+            ? { where: { branchId }, select: { quantity: true } }
+            : false,
+        },
+        orderBy: [{ name: "asc" }],
+        take: input.limit + 1,
+        cursor: input.cursor ? { id: input.cursor } : undefined,
+      });
+
+      let nextCursor: string | undefined;
+      if (products.length > input.limit) {
+        nextCursor = products.pop()!.id;
+      }
+
+      return {
+        products: products.map((p) => ({
+          ...p,
+          stockQuantity: branchId ? (p.stockLevels[0]?.quantity ?? 0) : null,
+          stockLevels: undefined,
+        })),
+        nextCursor,
+      };
+    }),
+
   get: tenantProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {

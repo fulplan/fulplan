@@ -658,6 +658,32 @@ model SalaryPayment {
   @@map("salary_payments")
 }
 
+/// Immutable audit trail. Written on every significant mutation.
+/// Never update or delete rows — add corrections via new entries.
+model AuditLog {
+  id             String @id @default(cuid())
+  organizationId String
+
+  /// Who did it (userId). null for system-initiated actions (cron, webhook).
+  actorId   String?
+  actorName String?
+
+  /// Dot-notation action e.g. "product.priceChange", "sale.void", "staff.deactivate"
+  action     String
+  entityType String /// "Product" | "Sale" | "User" | "Shift" | "Expense"
+  entityId   String
+
+  /// JSON snapshot: { before: {...}, after: {...} } — only changed fields
+  changes Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, entityType, entityId])
+  @@index([organizationId, actorId])
+  @@map("audit_logs")
+}
+
 /// A business expense (rent, electricity, transport, supplies, etc.).
 model Expense {
   id             String       @id @default(cuid())

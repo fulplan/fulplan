@@ -46,8 +46,12 @@ export function StockTakePage() {
   if (isLoading) return <div className="p-4 text-sm text-muted">Loading…</div>;
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
-      <h1 className="text-xl font-bold mb-4">Stock take</h1>
+    <div className="flex flex-col min-h-full">
+      <div className="border-b border-line px-6 py-4 bg-paper">
+        <h1 className="text-sm font-semibold text-ink">Stock take</h1>
+        <p className="text-xs text-muted mt-0.5">Count and reconcile inventory</p>
+      </div>
+      <div className="px-6 py-4 max-w-2xl">
 
       {/* ── Close result banner ── */}
       {closeResult && (
@@ -91,7 +95,7 @@ export function StockTakePage() {
       {/* ── Past sessions ── */}
       {pastList && pastList.length > 0 && (
         <div className="mt-8">
-          <h2 className="font-semibold text-sm mb-2">Past sessions</h2>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted mb-2">Past sessions</p>
           <div className="border border-line divide-y divide-line">
             {pastList.map((s) => (
               <div key={s.id} className="px-4 py-3 text-sm">
@@ -109,6 +113,7 @@ export function StockTakePage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -131,7 +136,7 @@ function NoActiveTake({
       <button
         onClick={onStart}
         disabled={isStarting}
-        className="px-6 py-3 bg-ink text-paper font-semibold text-sm disabled:opacity-50"
+        className="px-6 py-2.5 bg-ink text-paper font-semibold text-sm hover:opacity-80 disabled:opacity-50"
       >
         {isStarting ? "Starting…" : "Start stock take"}
       </button>
@@ -275,7 +280,7 @@ function ActiveTake({
         <button
           onClick={() => setShowConfirm(true)}
           disabled={countedCount === 0}
-          className="w-full py-3 border-2 border-ink text-sm font-semibold hover:bg-field disabled:opacity-30"
+          className="w-full py-2.5 border border-line text-sm font-semibold text-ink hover:bg-field disabled:opacity-30"
         >
           Finish &amp; apply adjustments
         </button>

@@ -123,7 +123,7 @@ function InvoiceView({ sale }: { sale: SaleData }) {
       <div className="print:hidden mt-5 mx-auto space-y-3" style={{ maxWidth: 600 }}>
         <button
           onClick={handlePrint}
-          className="flex w-full items-center justify-center border-2 border-ink bg-paper py-3 text-sm font-semibold hover:bg-field"
+          className="flex w-full items-center justify-center border border-line bg-paper py-2.5 text-sm font-semibold hover:bg-field"
         >
           Print / Save as PDF
         </button>
@@ -219,7 +219,7 @@ function ReceiptView({ sale }: { sale: SaleData }) {
       <div className="print:hidden mt-5 mx-auto space-y-3" style={{ maxWidth: 320 }}>
         <button
           onClick={() => window.print()}
-          className="flex w-full items-center justify-center border-2 border-ink bg-paper py-3 text-sm font-semibold hover:bg-field"
+          className="flex w-full items-center justify-center border border-line bg-paper py-2.5 text-sm font-semibold hover:bg-field"
         >
           Print receipt
         </button>

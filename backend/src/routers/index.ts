@@ -16,6 +16,7 @@ import { salesRouter } from "./sales";
 import { salaryRouter } from "./salary";
 import { shiftsRouter } from "./shifts";
 import { staffRouter } from "./staff";
+import { superAdminRouter } from "./superAdmin";
 
 export const appRouter = router({
   health: healthRouter,
@@ -35,6 +36,7 @@ export const appRouter = router({
   reports: reportsRouter,
   export: exportRouter,
   account: accountRouter,
+  superAdmin: superAdminRouter,
 });
 
 /** The frontend imports this type only — no server code crosses the wire. */

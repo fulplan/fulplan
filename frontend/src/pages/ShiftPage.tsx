@@ -61,14 +61,14 @@ function ClockInPanel({
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-6">
       <div className="w-full max-w-sm">
-        <h2 className="text-xl font-semibold">Clock in</h2>
+        <h2 className="text-base font-semibold text-ink">Clock in</h2>
         <p className="mt-1 text-sm text-muted">
           Enter the opening cash float — the amount of change money in the till
           before any sales.
         </p>
 
         <div className="mt-6">
-          <label className="mb-1.5 block text-sm font-medium">
+          <label className="text-xs text-muted uppercase tracking-wide block mb-1.5">
             Opening float (GH₵)
           </label>
           <input
@@ -81,7 +81,7 @@ function ClockInPanel({
             onChange={(e) => { setFloatStr(e.target.value); setError(''); }}
             onKeyDown={(e) => e.key === 'Enter' && submit()}
             autoFocus
-            className="w-full border-2 border-ink bg-field px-3 py-3 text-lg font-mono tabular-nums focus:outline-none"
+            className="w-full border border-line bg-field px-3 py-3 text-lg font-mono tabular-nums focus:outline-none focus:border-ink"
           />
         </div>
 
@@ -90,7 +90,7 @@ function ClockInPanel({
         <button
           onClick={submit}
           disabled={openMutation.isPending}
-          className="mt-4 w-full bg-brand py-4 text-base font-semibold text-paper disabled:opacity-50 hover:opacity-90"
+          className="mt-4 w-full bg-ink py-3 text-sm font-semibold text-paper disabled:opacity-50 hover:opacity-80"
         >
           {openMutation.isPending ? 'Opening…' : 'Clock in'}
         </button>
@@ -132,19 +132,19 @@ function CashEntryModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-w-sm border-2 border-ink bg-paper">
-        <div className="border-b-2 border-ink px-5 py-4">
-          <h2 className="text-lg font-semibold">Add cash entry</h2>
+      <div className="w-full max-w-sm border border-line bg-paper">
+        <div className="border-b border-line px-5 py-4">
+          <h2 className="text-sm font-semibold text-ink">Add cash entry</h2>
         </div>
         <div className="px-5 py-4 space-y-4">
-          <div className="grid grid-cols-2 border-2 border-ink">
+          <div className="grid grid-cols-2 border border-line">
             {(['OUT', 'IN'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setType(t)}
                 className={[
-                  'py-3 text-sm font-semibold',
-                  type === t ? 'bg-ink text-paper' : 'bg-paper text-ink hover:bg-field',
+                  'py-2.5 text-sm font-semibold',
+                  type === t ? 'bg-ink text-paper' : 'bg-paper text-muted hover:bg-field hover:text-ink',
                 ].join(' ')}
               >
                 {t === 'IN' ? 'Cash in' : 'Cash out'}
@@ -153,7 +153,7 @@ function CashEntryModal({
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium">Amount (GH₵)</label>
+            <label className="text-xs text-muted uppercase tracking-wide block mb-1.5">Amount (GH₵)</label>
             <input
               type="number"
               inputMode="decimal"
@@ -163,13 +163,13 @@ function CashEntryModal({
               value={amountStr}
               onChange={(e) => { setAmountStr(e.target.value); setError(''); }}
               autoFocus
-              className="w-full border-2 border-ink bg-field px-3 py-2 text-lg font-mono tabular-nums focus:outline-none"
+              className="w-full border border-line bg-field px-3 py-2 text-lg font-mono tabular-nums focus:outline-none focus:border-ink"
             />
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium">
-              Note <span className="text-muted">(optional)</span>
+            <label className="text-xs text-muted uppercase tracking-wide block mb-1.5">
+              Note <span className="normal-case">(optional)</span>
             </label>
             <input
               type="text"
@@ -186,14 +186,14 @@ function CashEntryModal({
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={onClose}
-              className="border-2 border-ink py-3 text-sm font-semibold hover:bg-field"
+              className="border border-line py-2.5 text-sm text-muted hover:bg-field hover:text-ink"
             >
               Cancel
             </button>
             <button
               onClick={submit}
               disabled={addMutation.isPending}
-              className="bg-ink py-3 text-sm font-semibold text-paper disabled:opacity-50 hover:opacity-90"
+              className="bg-ink py-2.5 text-sm font-semibold text-paper disabled:opacity-50 hover:opacity-80"
             >
               {addMutation.isPending ? 'Saving…' : 'Add'}
             </button>
@@ -249,23 +249,23 @@ function CloseShiftModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-w-sm border-2 border-ink bg-paper">
-        <div className="border-b-2 border-ink px-5 py-4">
-          <h2 className="text-lg font-semibold">Close shift</h2>
-          <p className="mt-0.5 text-sm text-muted">
+      <div className="w-full max-w-sm border border-line bg-paper">
+        <div className="border-b border-line px-5 py-4">
+          <h2 className="text-sm font-semibold text-ink">Close shift</h2>
+          <p className="mt-0.5 text-xs text-muted">
             Count the cash in the till and enter the total below.
           </p>
         </div>
         <div className="px-5 py-4 space-y-4">
           <div className="flex justify-between border border-line bg-field px-4 py-3">
-            <span className="text-sm font-medium">Expected in till</span>
+            <span className="text-sm text-muted">Expected in till</span>
             <span className="font-mono text-sm font-bold tabular-nums">
               {formatGhs(expectedCash)}
             </span>
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium">
+            <label className="text-xs text-muted uppercase tracking-wide block mb-1.5">
               Counted cash (GH₵)
             </label>
             <input
@@ -277,7 +277,7 @@ function CloseShiftModal({
               value={countedStr}
               onChange={(e) => { setCountedStr(e.target.value); setError(''); }}
               autoFocus
-              className="w-full border-2 border-ink bg-field px-3 py-2 text-lg font-mono tabular-nums focus:outline-none"
+              className="w-full border border-line bg-field px-3 py-2 text-lg font-mono tabular-nums focus:outline-none focus:border-ink"
             />
           </div>
 
@@ -294,8 +294,8 @@ function CloseShiftModal({
           )}
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium">
-              Note <span className="text-muted">(optional)</span>
+            <label className="text-xs text-muted uppercase tracking-wide block mb-1.5">
+              Note <span className="normal-case">(optional)</span>
             </label>
             <input
               type="text"
@@ -312,14 +312,14 @@ function CloseShiftModal({
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={onClose}
-              className="border-2 border-ink py-3 text-sm font-semibold hover:bg-field"
+              className="border border-line py-2.5 text-sm text-muted hover:bg-field hover:text-ink"
             >
               Cancel
             </button>
             <button
               onClick={submit}
               disabled={closeMutation.isPending || !countedStr}
-              className="bg-danger py-3 text-sm font-semibold text-paper disabled:opacity-30 hover:opacity-90"
+              className="bg-danger py-2.5 text-sm font-semibold text-paper disabled:opacity-30 hover:opacity-90"
             >
               {closeMutation.isPending ? 'Closing…' : 'Close shift'}
             </button>
@@ -362,16 +362,16 @@ function ActiveShiftPanel({
           </div>
           <button
             onClick={() => setShowClose(true)}
-            className="border-2 border-danger px-4 py-2 text-sm font-semibold text-danger hover:bg-danger hover:text-paper"
+            className="border border-danger px-3 py-1.5 text-sm font-semibold text-danger hover:bg-danger hover:text-paper transition-colors"
           >
             Close shift
           </button>
         </div>
 
         {/* Till summary */}
-        <div className="mb-5 border-2 border-ink">
-          <div className="border-b-2 border-ink px-4 py-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+        <div className="mb-5 border border-line">
+          <div className="border-b border-line px-4 py-2.5 bg-field">
+            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
               Till summary
             </span>
           </div>
@@ -386,9 +386,9 @@ function ActiveShiftPanel({
               />
             )}
           </div>
-          <div className="border-t-2 border-ink bg-field px-4 py-3 flex justify-between items-baseline">
-            <span className="text-sm font-semibold">Expected in till</span>
-            <span className="font-mono text-xl font-bold tabular-nums">
+          <div className="border-t border-line bg-field px-4 py-3 flex justify-between items-baseline">
+            <span className="text-sm font-semibold text-ink">Expected in till</span>
+            <span className="font-mono text-xl font-bold tabular-nums text-ink">
               {formatGhs(shift.expectedNow)}
             </span>
           </div>
@@ -396,12 +396,12 @@ function ActiveShiftPanel({
 
         {/* Cash entries */}
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
             Cash entries
-          </h3>
+          </p>
           <button
             onClick={() => setShowCashEntry(true)}
-            className="border border-ink px-3 py-1 text-sm font-medium hover:bg-field"
+            className="border border-line px-3 py-1 text-xs text-muted hover:bg-field hover:text-ink transition-colors"
           >
             + Add
           </button>
@@ -557,8 +557,9 @@ export function ShiftPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="border-b-2 border-ink px-5 py-4">
-        <h1 className="text-lg font-semibold">Shift</h1>
+      <div className="border-b border-line px-6 py-4 bg-paper">
+        <h1 className="text-sm font-semibold text-ink">Shift</h1>
+        <p className="text-xs text-muted mt-0.5">Open, manage, and close your shift</p>
       </div>
 
       {shift ? (
@@ -569,9 +570,9 @@ export function ShiftPage() {
 
       {/* Past shifts — managers only */}
       {isManager && (
-        <div className="border-t-2 border-ink">
-          <div className="px-5 py-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+        <div className="border-t border-line">
+          <div className="px-6 py-3">
+            <h2 className="text-xs font-bold tracking-[0.14em] uppercase text-muted">
               Past shifts
             </h2>
           </div>

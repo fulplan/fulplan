@@ -51,40 +51,44 @@ export function SuppliersPage() {
   }
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold">Suppliers</h1>
+    <div className="flex flex-col min-h-full">
+      <div className="border-b border-line px-6 py-4 bg-paper flex items-center justify-between">
+        <div>
+          <h1 className="text-sm font-semibold text-ink">Suppliers</h1>
+          <p className="text-xs text-muted mt-0.5">Manage suppliers and purchase credit</p>
+        </div>
         <button
-          className="px-4 py-2 bg-ink text-paper text-sm font-semibold"
+          className="px-4 py-1.5 bg-ink text-paper text-sm font-semibold hover:opacity-80"
           onClick={() => setView("add")}
         >
           + Add supplier
         </button>
       </div>
+      <div className="px-6 py-4">
+        <input
+          type="search"
+          placeholder="Search by name or phone…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full border border-line bg-field px-3 py-2 text-sm mb-4 max-w-md"
+        />
 
-      <input
-        type="search"
-        placeholder="Search by name or phone…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full border border-line px-3 py-2 text-sm mb-4"
-      />
+        {isLoading && <p className="text-muted text-sm">Loading…</p>}
 
-      {isLoading && <p className="text-muted text-sm">Loading…</p>}
+        {!isLoading && data?.suppliers.length === 0 && (
+          <div className="text-center py-16 text-muted">
+            {search ? "No suppliers match your search." : "No suppliers yet — add your first one."}
+          </div>
+        )}
 
-      {!isLoading && data?.suppliers.length === 0 && (
-        <div className="text-center py-16 text-muted">
-          {search ? "No suppliers match your search." : "No suppliers yet — add your first one."}
-        </div>
-      )}
-
-      {data && data.suppliers.length > 0 && (
-        <div className="border border-line divide-y divide-line">
-          {data.suppliers.map((s) => (
-            <SupplierRow key={s.id} supplier={s} onSelect={() => handleSelect(s.id)} />
-          ))}
-        </div>
-      )}
+        {data && data.suppliers.length > 0 && (
+          <div className="border border-line divide-y divide-line">
+            {data.suppliers.map((s) => (
+              <SupplierRow key={s.id} supplier={s} onSelect={() => handleSelect(s.id)} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -132,40 +136,42 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
   if (!data) return <div className="p-4 text-sm text-danger">Supplier not found.</div>;
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
-      <button className="text-sm text-muted mb-4" onClick={onBack}>
-        ← Back to suppliers
-      </button>
+    <div className="flex flex-col min-h-full">
+      <div className="border-b border-line px-6 py-3 bg-paper flex items-center gap-3">
+        <button onClick={onBack} className="text-muted hover:text-ink text-sm leading-none">←</button>
+        <h1 className="text-sm font-semibold text-ink">{data.name}</h1>
+      </div>
+      <div className="px-6 py-4 max-w-2xl">
 
-      <div className="border border-line p-4 mb-4">
-        <div className="flex items-start justify-between">
+      <div className="border border-line mb-4">
+        <div className="flex items-start justify-between px-5 py-4">
           <div>
-            <h2 className="text-lg font-bold">{data.name}</h2>
-            <div className="text-sm text-muted">{data.phone ?? data.email ?? "No contact"}</div>
-            {data.notes && <div className="text-xs text-muted mt-1">{data.notes}</div>}
+            <p className="text-sm font-semibold text-ink">{data.name}</p>
+            <p className="text-xs text-muted mt-0.5">{data.phone ?? data.email ?? "No contact"}</p>
+            {data.notes && <p className="text-xs text-muted mt-1">{data.notes}</p>}
           </div>
           <div className="text-right">
-            <div className={`text-xl font-mono font-bold tabular-nums ${data.balance > 0 ? "text-danger" : "text-brand"}`}>
+            <p className={`text-xl font-mono font-bold tabular-nums ${data.balance > 0 ? "text-danger" : "text-brand"}`}>
               {data.balance > 0 ? `Owe ${formatMoney(data.balance)}` : "No balance"}
-            </div>
+            </p>
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="border-t border-line px-5 py-3 flex flex-wrap gap-2">
           <button
-            className="px-4 py-2 bg-ink text-paper text-sm font-semibold"
+            className="px-3 py-1.5 bg-ink text-paper text-sm font-semibold hover:opacity-80"
             onClick={() => setAction(action === "receive" ? null : "receive")}
           >
             Receive stock
           </button>
           <button
-            className="px-4 py-2 border border-line text-sm font-medium hover:bg-field"
+            className="px-3 py-1.5 border border-line text-sm text-muted hover:bg-field hover:text-ink"
             onClick={() => setAction(action === "purchase" ? null : "purchase")}
           >
             + Record purchase
           </button>
           {data.balance > 0 && (
             <button
-              className="px-4 py-2 bg-brand text-paper text-sm font-semibold"
+              className="px-3 py-1.5 border border-line text-sm text-muted hover:bg-field hover:text-ink"
               onClick={() => setAction(action === "payment" ? null : "payment")}
             >
               Record payment
@@ -192,7 +198,7 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
         />
       )}
 
-      <h3 className="font-semibold text-sm mb-2">Ledger</h3>
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted mb-2">Ledger</p>
       {data.entries.length === 0 ? (
         <div className="text-sm text-muted py-4 text-center">No entries yet.</div>
       ) : (
@@ -215,6 +221,7 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -269,9 +276,11 @@ function EntryForm({
   const confirmLabel = type === "purchase" ? "Record purchase" : "Confirm payment";
 
   return (
-    <div className="border border-line p-4 mb-4 bg-field">
-      <h3 className="font-semibold text-sm mb-3 capitalize">{type === "purchase" ? "Record purchase" : "Record payment"}</h3>
-      <form onSubmit={handleSubmit} className="space-y-3">
+    <div className="border border-line mb-4">
+      <div className="border-b border-line px-4 py-3">
+        <p className="text-sm font-semibold text-ink">{type === "purchase" ? "Record purchase" : "Record payment"}</p>
+      </div>
+      <form onSubmit={handleSubmit} className="p-4 space-y-3">
         <div>
           <label className="block text-xs text-muted mb-1">{label}</label>
           <input
@@ -301,14 +310,14 @@ function EntryForm({
           <button
             type="submit"
             disabled={isPending}
-            className="flex-1 py-2 bg-brand text-paper text-sm font-semibold disabled:opacity-50"
+            className="flex-1 py-2 bg-ink text-paper text-sm font-semibold hover:opacity-80 disabled:opacity-50"
           >
             {isPending ? "Saving…" : confirmLabel}
           </button>
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 border border-line text-sm"
+            className="px-4 py-2 border border-line text-sm text-muted hover:bg-field hover:text-ink"
           >
             Cancel
           </button>
@@ -405,9 +414,11 @@ function ReceiveStockForm({
   const totalValue = lines.reduce((s, l) => s + l.costPrice * l.quantity, 0);
 
   return (
-    <div className="border border-line p-4 mb-4 bg-field">
-      <h3 className="font-semibold text-sm mb-3">Receive stock from {supplierName}</h3>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="border border-line mb-4">
+      <div className="border-b border-line px-4 py-3">
+        <p className="text-sm font-semibold text-ink">Receive stock from {supplierName}</p>
+      </div>
+      <form onSubmit={handleSubmit} className="p-4 space-y-4">
 
         {/* Branch */}
         {branches && branches.length > 1 && (
@@ -520,7 +531,7 @@ function ReceiveStockForm({
           >
             {receive.isPending ? "Saving…" : `Receive ${lines.length} item${lines.length !== 1 ? 's' : ''}`}
           </button>
-          <button type="button" onClick={onCancel} className="px-4 py-2 border border-line text-sm">
+          <button type="button" onClick={onCancel} className="px-4 py-2 border border-line text-sm text-muted hover:bg-field hover:text-ink">
             Cancel
           </button>
         </div>
@@ -562,11 +573,12 @@ function AddSupplierForm({
   }
 
   return (
-    <div className="p-4 max-w-md mx-auto">
-      <button className="text-sm text-muted mb-4" onClick={onBack}>
-        ← Back to suppliers
-      </button>
-      <h2 className="text-lg font-bold mb-4">Add supplier</h2>
+    <div className="flex flex-col min-h-full">
+      <div className="border-b border-line px-6 py-3 bg-paper flex items-center gap-3">
+        <button onClick={onBack} className="text-muted hover:text-ink text-sm leading-none">←</button>
+        <h1 className="text-sm font-semibold text-ink">Add supplier</h1>
+      </div>
+      <div className="px-6 py-4 max-w-md">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-xs text-muted mb-1">Name *</label>
@@ -617,11 +629,12 @@ function AddSupplierForm({
         <button
           type="submit"
           disabled={create.isPending}
-          className="w-full py-3 bg-ink text-paper font-semibold text-sm disabled:opacity-50"
+          className="w-full py-2.5 bg-ink text-paper font-semibold text-sm hover:opacity-80 disabled:opacity-50"
         >
           {create.isPending ? "Saving…" : "Add supplier"}
         </button>
       </form>
+      </div>
     </div>
   );
 }

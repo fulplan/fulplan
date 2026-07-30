@@ -32,9 +32,6 @@ export const customersRouter = router({
         },
         include: {
           _count: { select: { sales: true } },
-          creditEntries: {
-            select: { type: true, amount: true },
-          },
         },
         orderBy: { name: "asc" },
         take: input.limit + 1,
@@ -44,6 +41,26 @@ export const customersRouter = router({
       let nextCursor: string | undefined;
       if (customers.length > input.limit) {
         nextCursor = customers.pop()!.id;
+      }
+
+      // Aggregate credit balances in one SQL query instead of loading all rows
+      const customerIds = customers.map((c) => c.id);
+      const balanceAgg = customerIds.length > 0
+        ? await ctx.prisma.creditEntry.groupBy({
+            by: ["customerId", "type"],
+            where: { customerId: { in: customerIds } },
+            _sum: { amount: true },
+          })
+        : [];
+
+      const balanceMap = new Map<string, number>();
+      for (const row of balanceAgg) {
+        const prev = balanceMap.get(row.customerId) ?? 0;
+        const delta = row._sum.amount ?? 0;
+        balanceMap.set(
+          row.customerId,
+          row.type === "CHARGE" ? prev + delta : prev - delta
+        );
       }
 
       return {
@@ -56,7 +73,7 @@ export const customersRouter = router({
           active: c.active,
           createdAt: c.createdAt,
           salesCount: c._count.sales,
-          balance: computeBalance(c.creditEntries),
+          balance: balanceMap.get(c.id) ?? 0,
         })),
         nextCursor,
       };

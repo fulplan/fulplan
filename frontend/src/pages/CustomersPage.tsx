@@ -52,40 +52,44 @@ export function CustomersPage() {
   }
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold">Customers</h1>
+    <div className="flex flex-col min-h-full">
+      <div className="border-b border-line px-6 py-4 bg-paper flex items-center justify-between">
+        <div>
+          <h1 className="text-sm font-semibold text-ink">Customers</h1>
+          <p className="text-xs text-muted mt-0.5">Credit accounts and purchase history</p>
+        </div>
         <button
-          className="px-4 py-2 bg-ink text-paper text-sm font-semibold"
+          className="px-4 py-1.5 bg-ink text-paper text-sm font-semibold hover:opacity-80"
           onClick={() => setView("add")}
         >
           + Add customer
         </button>
       </div>
+      <div className="px-6 py-4">
+        <input
+          type="search"
+          placeholder="Search by name or phone…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full border border-line bg-field px-3 py-2 text-sm mb-4 max-w-md"
+        />
 
-      <input
-        type="search"
-        placeholder="Search by name or phone…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full border border-line px-3 py-2 text-sm mb-4"
-      />
+        {isLoading && <p className="text-muted text-sm">Loading…</p>}
 
-      {isLoading && <p className="text-muted text-sm">Loading…</p>}
+        {!isLoading && data?.customers.length === 0 && (
+          <div className="text-center py-16 text-muted">
+            {search ? "No customers match your search." : "No customers yet — add your first one."}
+          </div>
+        )}
 
-      {!isLoading && data?.customers.length === 0 && (
-        <div className="text-center py-16 text-muted">
-          {search ? "No customers match your search." : "No customers yet — add your first one."}
-        </div>
-      )}
-
-      {data && data.customers.length > 0 && (
-        <div className="border border-line divide-y divide-line">
-          {data.customers.map((c) => (
-            <CustomerRow key={c.id} customer={c} onSelect={() => handleSelect(c.id)} />
-          ))}
-        </div>
-      )}
+        {data && data.customers.length > 0 && (
+          <div className="border border-line divide-y divide-line">
+            {data.customers.map((c) => (
+              <CustomerRow key={c.id} customer={c} onSelect={() => handleSelect(c.id)} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -132,34 +136,38 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
   if (!data) return <div className="p-4 text-sm text-danger">Customer not found.</div>;
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
-      <button className="text-sm text-muted mb-4" onClick={onBack}>
-        ← Back to customers
-      </button>
+    <div className="flex flex-col min-h-full">
+      <div className="border-b border-line px-6 py-3 bg-paper flex items-center gap-3">
+        <button onClick={onBack} className="text-muted hover:text-ink text-sm leading-none">←</button>
+        <h1 className="text-sm font-semibold text-ink">{data.name}</h1>
+      </div>
+      <div className="px-6 py-4 max-w-2xl">
 
-      <div className="border border-line p-4 mb-4">
-        <div className="flex items-start justify-between">
+      <div className="border border-line mb-4">
+        <div className="flex items-start justify-between px-5 py-4">
           <div>
-            <h2 className="text-lg font-bold">{data.name}</h2>
-            <div className="text-sm text-muted">{data.phone ?? "No phone"}</div>
-            {data.notes && <div className="text-xs text-muted mt-1">{data.notes}</div>}
+            <p className="text-sm font-semibold text-ink">{data.name}</p>
+            <p className="text-xs text-muted mt-0.5">{data.phone ?? "No phone"}</p>
+            {data.notes && <p className="text-xs text-muted mt-1">{data.notes}</p>}
           </div>
           <div className="text-right">
-            <div className={`text-xl font-mono font-bold tabular-nums ${data.balance > 0 ? "text-danger" : "text-brand"}`}>
+            <p className={`text-xl font-mono font-bold tabular-nums ${data.balance > 0 ? "text-danger" : "text-brand"}`}>
               {data.balance > 0 ? `Owes ${formatMoney(data.balance)}` : "No balance"}
-            </div>
+            </p>
             {data.creditLimit != null && (
-              <div className="text-xs text-muted">Limit: {formatMoney(data.creditLimit)}</div>
+              <p className="text-xs text-muted mt-0.5">Limit: {formatMoney(data.creditLimit)}</p>
             )}
           </div>
         </div>
         {data.balance > 0 && (
-          <button
-            className="mt-3 px-4 py-2 bg-brand text-paper text-sm font-semibold"
-            onClick={() => setShowPayment(true)}
-          >
-            Record payment
-          </button>
+          <div className="border-t border-line px-5 py-3">
+            <button
+              className="px-4 py-1.5 bg-ink text-paper text-sm font-semibold hover:opacity-80"
+              onClick={() => setShowPayment(true)}
+            >
+              Record payment
+            </button>
+          </div>
         )}
       </div>
 
@@ -172,7 +180,7 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
         />
       )}
 
-      <h3 className="font-semibold text-sm mb-2">Credit ledger</h3>
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted mb-2">Credit ledger</p>
       {data.entries.length === 0 ? (
         <div className="text-sm text-muted py-4 text-center">No credit activity yet.</div>
       ) : (
@@ -195,6 +203,7 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -238,9 +247,11 @@ function RecordPaymentForm({
   }
 
   return (
-    <div className="border border-line p-4 mb-4 bg-field">
-      <h3 className="font-semibold text-sm mb-3">Record payment</h3>
-      <form onSubmit={handleSubmit} className="space-y-3">
+    <div className="border border-line mb-4">
+      <div className="border-b border-line px-4 py-3">
+        <p className="text-sm font-semibold text-ink">Record payment</p>
+      </div>
+      <form onSubmit={handleSubmit} className="p-4 space-y-3">
         <div>
           <label className="block text-xs text-muted mb-1">Amount (GH₵)</label>
           <input
@@ -250,7 +261,7 @@ function RecordPaymentForm({
             placeholder="0.00"
             value={pesewas}
             onChange={(e) => setPesewas(e.target.value)}
-            className="w-full border border-line px-3 py-2 text-sm font-mono tabular-nums"
+            className="w-full border border-line bg-field px-3 py-2 text-sm font-mono tabular-nums focus:outline-none focus:border-ink"
             autoFocus
           />
         </div>
@@ -261,7 +272,7 @@ function RecordPaymentForm({
             placeholder="e.g. Cash payment"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="w-full border border-line px-3 py-2 text-sm"
+            className="w-full border border-line bg-field px-3 py-2 text-sm focus:outline-none focus:border-ink"
             maxLength={200}
           />
         </div>
@@ -270,14 +281,14 @@ function RecordPaymentForm({
           <button
             type="submit"
             disabled={addPayment.isPending}
-            className="flex-1 py-2 bg-brand text-paper text-sm font-semibold disabled:opacity-50"
+            className="flex-1 py-2 bg-ink text-paper text-sm font-semibold hover:opacity-80 disabled:opacity-50"
           >
             {addPayment.isPending ? "Saving…" : "Confirm payment"}
           </button>
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 border border-line text-sm"
+            className="px-4 py-2 border border-line text-sm text-muted hover:bg-field hover:text-ink"
           >
             Cancel
           </button>
@@ -326,11 +337,12 @@ function AddCustomerForm({
   }
 
   return (
-    <div className="p-4 max-w-md mx-auto">
-      <button className="text-sm text-muted mb-4" onClick={onBack}>
-        ← Back to customers
-      </button>
-      <h2 className="text-lg font-bold mb-4">Add customer</h2>
+    <div className="flex flex-col min-h-full">
+      <div className="border-b border-line px-6 py-3 bg-paper flex items-center gap-3">
+        <button onClick={onBack} className="text-muted hover:text-ink text-sm leading-none">←</button>
+        <h1 className="text-sm font-semibold text-ink">Add customer</h1>
+      </div>
+      <div className="px-6 py-4 max-w-md">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-xs text-muted mb-1">Name *</label>
@@ -338,7 +350,7 @@ function AddCustomerForm({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full border border-line px-3 py-2 text-sm"
+            className="w-full border border-line bg-field px-3 py-2 text-sm focus:outline-none focus:border-ink"
             placeholder="Customer name"
             maxLength={100}
             autoFocus
@@ -350,7 +362,7 @@ function AddCustomerForm({
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="w-full border border-line px-3 py-2 text-sm"
+            className="w-full border border-line bg-field px-3 py-2 text-sm focus:outline-none focus:border-ink"
             placeholder="e.g. 0244123456"
             maxLength={20}
           />
@@ -361,7 +373,7 @@ function AddCustomerForm({
             type="text"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full border border-line px-3 py-2 text-sm"
+            className="w-full border border-line bg-field px-3 py-2 text-sm focus:outline-none focus:border-ink"
             placeholder="Optional"
             maxLength={500}
           />
@@ -376,7 +388,7 @@ function AddCustomerForm({
             step="0.01"
             value={limitText}
             onChange={(e) => setLimitText(e.target.value)}
-            className="w-full border border-line px-3 py-2 text-sm font-mono tabular-nums"
+            className="w-full border border-line bg-field px-3 py-2 text-sm font-mono tabular-nums focus:outline-none focus:border-ink"
             placeholder="e.g. 100.00"
           />
         </div>
@@ -384,11 +396,12 @@ function AddCustomerForm({
         <button
           type="submit"
           disabled={create.isPending}
-          className="w-full py-3 bg-ink text-paper font-semibold text-sm disabled:opacity-50"
+          className="w-full py-2.5 bg-ink text-paper font-semibold text-sm hover:opacity-80 disabled:opacity-50"
         >
           {create.isPending ? "Saving…" : "Add customer"}
         </button>
       </form>
+      </div>
     </div>
   );
 }
