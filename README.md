@@ -1,88 +1,77 @@
-# GhPOS
+<div align="center">
 
-Multi-tenant retail POS SaaS for Ghana. Working name — final product name still to be decided (see `Pre-Launch-Checklist.md`).
+# Mutasim Abubakar
 
-The full product thinking lives in this repo as an Obsidian vault — start at **[Home.md](Home.md)**, then **[Tracker.md](Tracker.md)** for what's built and what's next.
+**Builder · Full-Stack Engineer · Product-Minded Developer**
 
-## Stack
+*Building software that works in the real world — offline-first, sunlight-readable, and designed for the people actually using it.*
 
-| Layer | Choice |
+[![Twitter](https://img.shields.io/badge/@fulplan-%231DA1F2.svg?style=flat&logo=twitter&logoColor=white)](https://twitter.com/fulplan)
+[![Medium](https://img.shields.io/badge/fulplan.medium.com-black?style=flat&logo=medium&logoColor=white)](https://fulplan.medium.com)
+[![GitHub](https://img.shields.io/badge/github.com/fulplan-%23181717.svg?style=flat&logo=github&logoColor=white)](https://github.com/fulplan)
+
+</div>
+
+---
+
+## What I'm Building
+
+### GhPOS — Multi-tenant Retail POS SaaS for Ghana
+> *The point-of-sale system built for the Ghanaian shop counter: offline-first PWA, works on cheap phones in direct sunlight, with MoMo payment splits, multi-branch management, and strict per-tenant data isolation.*
+
+**Stack:** React 19 · TypeScript · Vite PWA · tRPC · Fastify · PostgreSQL · Prisma · Tailwind v4
+
+**Key design decisions:**
+- Money stored as **integer pesewas** — never a float, never a rounding error
+- **Row-level security** in Postgres + tRPC middleware — one shop literally cannot see another's data
+- **Stock is event-sourced** — `stock_movements` is the source of truth, levels are a rebuildable cache
+- **Offline queue** — sales sync when the internet comes back, nothing lost at the counter
+- 56–64 px touch targets — fingers, not styluses, sometimes wet, sometimes holding a product
+
+---
+
+## Stack & Tools
+
+| | |
 |---|---|
-| Frontend | React 19 + Vite + TypeScript + Tailwind v4 (PWA) |
-| API | tRPC over Fastify |
-| Database | PostgreSQL + Prisma |
-| Hosting | Vercel (frontend) + Railway (backend + Postgres) |
+| **Frontend** | React, TypeScript, Vite, Tailwind CSS, shadcn/ui |
+| **Backend** | Node.js, Fastify, tRPC, Prisma |
+| **Database** | PostgreSQL (row-level security, event sourcing) |
+| **Deployment** | Railway, Render, Vercel |
+| **Testing** | Vitest — tenant isolation is a release blocker, not a flaky test |
 
-Why these: see [Architecture.md](Architecture.md).
+---
 
-## Getting started
+## Principles I Build By
 
-Prerequisites: Node 20+, Docker Desktop (for the local database).
+- **Offline-first** — assume the network will fail; design for it from the start
+- **Real users, real constraints** — cheap phones, slow connections, direct sunlight, one hand free
+- **Money is sacred** — integers only, explicit currency, no silent precision loss
+- **Security by design** — multi-tenancy enforced at two layers, secrets never in the repo
+- **Minimal UI, maximum clarity** — no rounded corners, no mascots, no soft pastels; high contrast for people who work
 
-```bash
-# 1. Install dependencies (npm workspaces — installs both apps)
-npm install
+---
 
-# 2. Create local env files
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env.local
+## GitHub Stats
 
-# 3. Start Postgres (requires Docker Desktop running)
-npm run db:up
+<div align="center">
 
-# 4. Create the schema and seed a demo tenant
-npm run db:migrate
-npm run db:seed
+![Mutasim's GitHub stats](https://github-readme-stats.vercel.app/api?username=fulplan&show_icons=true&theme=default&hide_border=true&count_private=true)
 
-# 5. Create the test database (separate from dev — tests truncate tables)
-npm run db:test:setup --workspace=backend
+![Top Languages](https://github-readme-stats.vercel.app/api/top-langs/?username=fulplan&layout=compact&hide_border=true&theme=default)
 
-# 6. Run both apps
-npm run dev
-```
+</div>
 
-- Frontend: http://localhost:5173
-- API: http://localhost:3000 (health check at `/health`, tRPC at `/trpc`)
+---
 
-## Testing
+## Find Me
 
-```bash
-npm test
-```
+- **Twitter / X** — [@fulplan](https://twitter.com/fulplan)
+- **Medium** — [fulplan.medium.com](https://fulplan.medium.com)
+- **Email** — eserwaah57@gmail.com
 
-Tests run against a **separate `ghpos_test` database** and truncate every table
-between runs, so they never touch your dev data. Re-run `db:test:setup` after
-changing the Prisma schema.
+---
 
-The highest-value tests are `backend/src/lib/tenant-db.test.ts` — they assert
-that one shop cannot read or write another shop's data through any Prisma
-operation. Treat a failure there as a release blocker, not a flaky test.
-
-## Scripts
-
-| Command | Does |
-|---|---|
-| `npm run dev` | Runs backend + frontend together |
-| `npm run build` | Builds both |
-| `npm run typecheck` | Typechecks both |
-| `npm test` | Runs all tests |
-| `npm run db:up` / `db:down` | Starts/stops local Postgres |
-| `npm run db:migrate` | Creates + applies a migration |
-| `npm run db:studio` | Opens Prisma Studio (visual DB browser) |
-| `npm run db:seed` | Seeds a demo tenant |
-
-## Repo layout
-
-```
-backend/     Fastify + tRPC + Prisma API
-frontend/    React + Vite PWA
-*.md         The project brain (Obsidian vault) — see Home.md
-```
-
-## Conventions that matter
-
-- **Money is always an integer count of pesewas.** Never a float. Use `backend/src/lib/money.ts`.
-- **Every tenant-scoped table carries `organizationId`**, enforced by tRPC middleware *and* Postgres row-level security.
-- **Stock is event-sourced** — `stock_movements` is the source of truth, stock levels are a rebuildable cache.
-- **No rounded corners.** Sharp rectangles throughout — see [Design-Language.md](Design-Language.md).
-- **Secrets never enter the repo.** `.env` is gitignored; real values live in Vercel/Railway env vars.
+<div align="center">
+<sub>Available for hire · <a href="https://github.com/fulplan?tab=repositories">See all repositories →</a></sub>
+</div>
